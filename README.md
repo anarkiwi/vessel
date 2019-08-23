@@ -1,6 +1,8 @@
 Vessel
 ======
 
+![alt text](vessel.jpg)
+
 Vessel is a high performance MIDI interface for the C64 based on an
 Arduino Due-like platform, optimized to reduce interrupt load on the
 C64.  Vessel is only compatible with software written specially for it
@@ -65,13 +67,9 @@ You should select the right port in the Tools menu before uploading.
 
 NOTE: you will need to add the following to to WInterrupts.c:
 
-.. code-block:: none
-
     void PIOC_Handler (void) __attribute__ ((weak));
 
 On Linux this can be located with the following command.
-
-.. code-block:: none
 
     josh@vek-x:~$ find .arduino15 -name WInterrupts.c
     .arduino15/packages/arduino/hardware/sam/1.6.12/cores/arduino/WInterrupts.c
