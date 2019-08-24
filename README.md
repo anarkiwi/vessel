@@ -8,10 +8,11 @@ Arduino Due-like platform, optimized to reduce interrupt load on the
 C64.  Vessel is only compatible with software written specially for it
 as it has its own protocol (see below).
 
-Vessel's main points of differences from other C64 MIDI interfaces,
-are that it uses the user port, not the cartridge port, and that it
-does not use any CIA shift register ports which can accept only one
-byte at a time (and can be used for other things).
+Vessel's main points of differences from other C64 MIDI interfaces are:
+
+    * it uses the user port, not the cartridge port
+    * it does not use/need any CIA shift register ports
+    * it can transfer multiple bytes per transaction (unlike ACIA/6850 designs)
 
 If you are interested in acquiring a Vessel please contact josh@vandervecken.com.
 
