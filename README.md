@@ -10,9 +10,9 @@ as it has its own protocol (see below).
 
 Vessel's main points of differences from other C64 MIDI interfaces are:
 
-    * it uses the user port, not the cartridge port
-    * it does not use/need any CIA shift register ports
-    * it can transfer multiple bytes per transaction (unlike ACIA/6850 designs)
+* it uses the user port, not the cartridge port
+* it does not use/need any CIA shift register ports
+* it can transfer multiple bytes per transaction (unlike ACIA/6850 designs)
 
 If you are interested in acquiring a Vessel please contact josh@vandervecken.com.
 
