@@ -1,0 +1,119 @@
+
+;	!src "date.inc"		;Contains labels
+	!src "start.inc"	;Contains start adress. This is specified in the makefile and is also used by the packer(s)
+
+;	* = $0801 ;-2 for ca65
+;         .word $0801
+
+;		!word nextline          ; link to next basic line
+;		!word 2001              ; line-nr
+;		!byte $9e               ; token for sys
+;		!pet "2061"
+;		!byte $00               ; end of basic-line
+;nextline:
+;		!byte $00,$00           ; end of basic-program
+
+
+;Things that the ardunio could do, to help the C64:
+; * Filter out MIDI IN messages that are not directed to midi channel X
+; * Maybe also have a special mode where everything except midi clock etc is filtered out? Maybe that mode should be interrupt driven rather than polling? Does this have consequences for the hardware?
+; * Translate RUNNING STATUS messages to plain explicit data, to simplify the code required to parse the MIDI IN data.
+; * I am not sure if "System Real Time Messages" (such as timing clock) may appear at any point in the middle of other data sequences, or if they only appear in boundaries between other "chunks" of data (such as a three byte NOTE ON event byte sequence). If they may appear at any point, maybe it would be cool if the interface could reorder the data a bit, to ensure that the real time messages only appear in the boundaries between chunks of data.
+
+
+
+init:		
+	sei	;Turn interrupts off
+
+	;Clear screen
+	ldx #0
+	stx $d020
+	stx $d021
+-	lda #$20
+	sta $0400,x	;Screen RAM
+	sta $0500,x
+	sta $0600,x
+	sta $0700,x
+	lda #5
+	sta $d800,x	;Color RAM
+	sta $d900,x
+	sta $da00,x
+	sta $db00,x
+	dex
+	bne -
+
+	;Set all pins to output (because MIDI output mode should the default state)
+	lda #$ff
+	sta $dd03 	;Poke 56579,255
+
+mainloop:
+
+	inc $d020
+
+	;Check if we have incoming bytes
+	jsr read_midi_in
+
+
+	dec $d020
+
+	ldx read_midi_in_bytesread
+	beq mainloop	;Skip the rest if no incoming data was found
+	
+	;Loop that reads bytes from screen ram and sends it back to the interface
+sendbytes:
+	lda $0400-1,x
+	sta $dd01
+	dex
+	bne sendbytes
+nosendbytes:
+
+;	;Manual note on command
+;	lda #$90
+;	sta $dd01
+;	lda #$37-12
+;	sta $dd01
+;	lda #$7f
+;	sta $dd01
+
+	jmp mainloop
+
+
+;----------------------------------------------
+;Subroutine that reads the available data (if any) in the MIDI IN buffer
+;...and stores it in screen ram, so it also happens to be displayed
+read_midi_in_bytesread:
+	!byte 0
+read_midi_in:
+	;Set PA2 to indicate Port B INPUT mode (change to MIDI IN mode)
+	lda $dd00
+	and #%11111011	;Set bit2 to 0
+	sta $dd00
+
+	;Set Port B to input (Question to Josh: should this rather come before the change to dd00 just above?)
+	lda #$00
+	sta $dd03
+
+	;First byte will tell the C64 how many incoming bytes that are available in the interface
+	ldx $dd01	;Read bytecount from Port B
+	stx read_midi_in_bytesread	;Store the number of bytes in a variable we can use later
+	beq read_bytes_nobytesleft
+
+read_bytes_loop:
+	lda $dd01	;Read MIDI data byte from Port B
+	sta $0400-1,x ;Store in incoming MIDI data buffer in c64 RAM (or do the actual parsing of the MIDI data straight away?)
+	dex
+	bne read_bytes_loop
+	;Here one may want to jump back to check if more new data has arrived already?
+read_bytes_nobytesleft:
+	
+	;Set PA2 back to 1 to indicate Port B OUTPUT mode (change to MIDI OUT mode)
+	lda $dd00
+	ora #%00000100	;Set bit2 to 1
+	sta $dd00
+
+	;Set Port B back to output again
+	lda #$ff
+	sta $dd03
+	rts	
+
+
