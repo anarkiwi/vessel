@@ -52,6 +52,8 @@ class DigitalPin {
 // PC9 is 41
 #define C64_PC2 41
 #define C64_PA2 40
+// 74 AKA PA25/MISO
+#define C64_FLAG 74
 #define DATA_DIR 44
 #define CONT_DIR 43
 
@@ -71,6 +73,7 @@ const uint16_t IN_BUF_SIZE = 256; // Ring buffer for bytes from C64.
 
 DigitalPin<C64_PA2> pa2Pin(INPUT, LOW);
 DigitalPin<C64_PC2> pc2Pin(INPUT, LOW);
+DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
 DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 
@@ -83,6 +86,7 @@ volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
+volatile bool flagSent = false;
 
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
@@ -152,7 +156,12 @@ inline void drainInBuf() {
 
 inline void drainOutBuf() {
   if (uartRxready()) {
+    if (!flagSent) {
+      flagPin.write(HIGH);
+      flagSent = true;
+    }
     outBuf[++(*outBufReadPtr)] = uartRead();
+    flagPin.write(LOW);
   }
 }
 
@@ -165,6 +174,7 @@ inline void inputMode() {
   noInterrupts();
   setInputMode();
   isrMode = ISR_INPUT;
+  flagSent = false;
   interrupts();
   while (inInputMode()) {
     drainOutBuf();
@@ -241,6 +251,7 @@ void setup() {
   disablePeripherals();
   REG_PMC_PCER0 |= (1UL << ID_PIOD); // enable PIO controller.
   controlDirPin.write(LOW);
+  flagPin.write(LOW);
   resetWritePtrs();
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
