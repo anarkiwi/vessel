@@ -125,6 +125,7 @@ inline void disablePeripherals() {
   }
   DISABLE_PERIPHERAL_PIN(C64_PA2);
   DISABLE_PERIPHERAL_PIN(C64_PC2);
+  DISABLE_PERIPHERAL_PIN(C64_FLAG);
 }
 
 inline bool inInputMode() {
