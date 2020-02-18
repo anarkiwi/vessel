@@ -22,25 +22,26 @@ Theory of operation
 
 The Vessel interface provides a buffered, 31250bps MIDI I/O
 implementation via the C64's user port, without requiring the
-C64 to handle an interupt.
+C64 to handle an interupt (though the C64 can choose to receive one
+ - see below).
 
-The current implementation is effectively a virtual UART with 255 byte
-transmit and receive buffers. Future versions of the driver will allow
-the C64 to offload some MIDI parsing/processing to the driver (for
-example, filter out unwanted MIDI messages).
+The current Vessel implementation is effectively a virtual UART with
+255 byte transmit and receive buffers. Future versions of the driver
+will allow the C64 to offload some MIDI parsing/processing to the driver
+(for example, filter out unwanted MIDI messages).
 
 The C64 provides a shift-register based TTL compatible serial port,
 implemented on a CIA 6526/8520, via the user port. This is
 inconvenient and slow as software must work with one bit at a time.
 
-Fortunately the user port also provides an TTL 8 bit I/O port to the
-same CIA chip, and the CIA can both generate a signal for external
-hardware that the C64 has written a value to that port, and can
-trigger an interrupt from external hardware that a value has been
-written externally. There is no buffering.
+Fortunately the user port also provides an (unbuffered) TTL 8 bit I/O
+interface to the same CIA chip. The CIA can both generate a signal for
+external hardware that the C64 has written a value to that port, and
+allows the external hardware to trigger an NMI (Vessel uses this to tell
+the C64 there is at least one byte read to read). 
 
-The Vessel interface uses the 8 bit I/O port (PB0-7), /PC2, and
-PA2. The C64 always controls the direction - whether it wants to read
+The Vessel interface uses this 8 bit I/O port (PB0-7), /PC2, PA2, and /FLAG. 
+The C64 always controls the direction - whether it wants to read
 from Vessel or write. Vessel will buffer incoming MIDI data until the
 C64 wants to read the buffer, and will also write out from the buffer
 any data that the C64 has written. The C64 can read and write to
@@ -61,8 +62,7 @@ from the MIDI port).
 The C64 has no way to know that Vessel has successfully read or
 written a byte, we simply have to keep up with its schedule. An
 Arduino Uno isn't fast enough, but a Due is (with time for other tasks
-while PA2 changes state input/output. We never interrupt the C64
-so the FLAG lines are not used.
+while PA2 changes state input/output. 
 
 
 Upgrading firmware
