@@ -17,17 +17,21 @@ class FakeSerial {
     void begin(int BaudRate) {
       _pending = false;
     }
+    inline __attribute__((always_inline))
     void set(byte i) {
       c = i;
       _pending = true;
     }
+    inline __attribute__((always_inline))
     byte read() {
       _pending = false;
       return c;
     }
+    inline __attribute__((always_inline))
     bool write(byte i) {
       return true;
     }
+    inline __attribute__((always_inline))
     unsigned available() {
       if (_pending) {
         return 1;
@@ -195,18 +199,12 @@ inline void drainInBuf() {
   }
 }
 
-inline void sendNMI() {
-  if (!flagSent) {
-    flagPin.write(HIGH);
-    flagSent = true;
-  }
-}
-
 inline void drainOutBuf() {
   if (uartRxready()) {
     fs.set(uartRead());
-    if (MIDI.read()) {
-      sendNMI();
+    if (!flagSent && MIDI.read()) {
+      flagPin.write(HIGH);
+      flagSent = true;
     }
     outBuf[++(*outBufReadPtr)] = fs.c;
     flagPin.write(LOW);
@@ -300,9 +298,9 @@ void setup() {
   REG_PMC_PCER0 |= (1UL << ID_PIOD); // enable PIO controller.
   controlDirPin.write(LOW);
   flagPin.write(LOW);
+  resetWritePtrs();
   MIDI.begin(MIDI_CHANNEL_OMNI);
   MIDI.turnThruOff();
-  resetWritePtrs();
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
   while (!inInputMode()) { };
