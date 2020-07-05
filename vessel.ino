@@ -14,7 +14,9 @@
 
 class FakeSerial {
   public:
-    void begin(int BaudRate) {};
+    void begin(int BaudRate) {
+      _pending = false;
+    }
     void set(byte i) {
       c = i;
       _pending = true;
