@@ -130,7 +130,6 @@ volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
-volatile bool flagSent = false;
 
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
@@ -202,9 +201,8 @@ inline void drainInBuf() {
 inline void drainOutBuf() {
   if (uartRxready()) {
     fs.set(uartRead());
-    if (!flagSent && MIDI.read()) {
+    if (MIDI.read()) {
       flagPin.write(HIGH);
-      flagSent = true;
     }
     outBuf[++(*outBufReadPtr)] = fs.c;
     flagPin.write(LOW);
@@ -220,7 +218,6 @@ inline void inputMode() {
   noInterrupts();
   setInputMode();
   isrMode = ISR_INPUT;
-  flagSent = false;
   interrupts();
   while (inInputMode()) {
     drainOutBuf();
