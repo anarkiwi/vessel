@@ -10,6 +10,44 @@
 
 
 #include <Arduino.h>
+#include <MIDI.h>
+
+class FakeSerial {
+  public:
+    void begin(int BaudRate) {};
+    void set(byte i) {
+      c = i;
+      _pending = true;
+    }
+    byte read() {
+      _pending = false;
+      return c;
+    }
+    bool write(byte i) {
+      return true;
+    }
+    unsigned available() {
+      if (_pending) {
+        return 1;
+      }
+      return 0;
+    }
+    byte c;
+  private:
+    bool _pending;
+};
+
+FakeSerial fs;
+
+#define  MIDI_CHANNEL  MIDI_CHANNEL_OMNI
+struct VesselSettings : public midi::DefaultSettings {
+  // cppcheck-suppress unusedStructMember
+  static const bool Use1ByteParsing = true;
+  static const int BaudRate = 0;
+};
+
+MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
+
 
 // TODO: custom optimized PIOC handler for PC2 int only.
 // add void PIOC_Handler (void) __attribute__ ((weak)); to WInterrupts.c
@@ -155,13 +193,20 @@ inline void drainInBuf() {
   }
 }
 
+inline void sendNMI() {
+  if (!flagSent) {
+    flagPin.write(HIGH);
+    flagSent = true;
+  }
+}
+
 inline void drainOutBuf() {
   if (uartRxready()) {
-    if (!flagSent) {
-      flagPin.write(HIGH);
-      flagSent = true;
+    fs.set(uartRead());
+    if (MIDI.read()) {
+      sendNMI();
     }
-    outBuf[++(*outBufReadPtr)] = uartRead();
+    outBuf[++(*outBufReadPtr)] = fs.c;
     flagPin.write(LOW);
   }
 }
@@ -253,6 +298,8 @@ void setup() {
   REG_PMC_PCER0 |= (1UL << ID_PIOD); // enable PIO controller.
   controlDirPin.write(LOW);
   flagPin.write(LOW);
+  MIDI.begin(MIDI_CHANNEL_OMNI);
+  MIDI.turnThruOff();
   resetWritePtrs();
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
