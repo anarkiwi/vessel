@@ -10,6 +10,52 @@
 
 
 #include <Arduino.h>
+#include <MIDI.h>
+
+#define MIDI_NMI  1
+
+class FakeSerial {
+  public:
+    void begin(int BaudRate) {
+      _pending = false;
+    }
+    inline __attribute__((always_inline))
+    void set(byte i) {
+      c = i;
+      _pending = true;
+    }
+    inline __attribute__((always_inline))
+    byte read() {
+      _pending = false;
+      return c;
+    }
+    inline __attribute__((always_inline))
+    bool write(byte i) {
+      return true;
+    }
+    inline __attribute__((always_inline))
+    unsigned available() {
+      if (_pending) {
+        return 1;
+      }
+      return 0;
+    }
+    byte c;
+  private:
+    bool _pending;
+};
+
+FakeSerial fs;
+
+#define  MIDI_CHANNEL  MIDI_CHANNEL_OMNI
+struct VesselSettings : public midi::DefaultSettings {
+  // cppcheck-suppress unusedStructMember
+  static const bool Use1ByteParsing = true;
+  static const int BaudRate = 0;
+};
+
+MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
+
 
 // TODO: custom optimized PIOC handler for PC2 int only.
 // add void PIOC_Handler (void) __attribute__ ((weak)); to WInterrupts.c
@@ -86,7 +132,6 @@ volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
-volatile bool flagSent = false;
 
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
@@ -157,11 +202,15 @@ inline void drainInBuf() {
 
 inline void drainOutBuf() {
   if (uartRxready()) {
-    if (!flagSent) {
+    fs.set(uartRead());
+#ifdef  MIDI_NMI
+    if (MIDI.read()) {
       flagPin.write(HIGH);
-      flagSent = true;
     }
-    outBuf[++(*outBufReadPtr)] = uartRead();
+#else
+    flagPin.write(HIGH);
+#endif
+    outBuf[++(*outBufReadPtr)] = fs.c;
     flagPin.write(LOW);
   }
 }
@@ -175,7 +224,6 @@ inline void inputMode() {
   noInterrupts();
   setInputMode();
   isrMode = ISR_INPUT;
-  flagSent = false;
   interrupts();
   while (inInputMode()) {
     drainOutBuf();
@@ -254,6 +302,8 @@ void setup() {
   controlDirPin.write(LOW);
   flagPin.write(LOW);
   resetWritePtrs();
+  MIDI.begin(MIDI_CHANNEL_OMNI);
+  MIDI.turnThruOff();
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
   while (!inInputMode()) { };
