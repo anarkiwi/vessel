@@ -12,6 +12,8 @@
 #include <Arduino.h>
 #include <MIDI.h>
 
+#define MIDI_NMI  1
+
 class FakeSerial {
   public:
     void begin(int BaudRate) {
@@ -201,9 +203,13 @@ inline void drainInBuf() {
 inline void drainOutBuf() {
   if (uartRxready()) {
     fs.set(uartRead());
+#ifdef  MIDI_NMI
     if (MIDI.read()) {
       flagPin.write(HIGH);
     }
+#else
+    flagPin.write(HIGH);
+#endif
     outBuf[++(*outBufReadPtr)] = fs.c;
     flagPin.write(LOW);
   }
