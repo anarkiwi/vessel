@@ -22,8 +22,8 @@ Theory of operation
 
 The Vessel interface provides a buffered, 31250bps MIDI I/O
 implementation via the C64's user port, without requiring the
-C64 to handle an interupt (though the C64 can choose to receive one
- - see below).
+C64 to handle an interupt (though the C64 can choose to receive
+one - see below).
 
 The current Vessel implementation is effectively a virtual UART with
 255 byte transmit and receive buffers. Future versions of the driver
