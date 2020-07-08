@@ -12,51 +12,6 @@
 #include <Arduino.h>
 #include <MIDI.h>
 
-#define MIDI_NMI  1
-
-class FakeSerial {
-  public:
-    void begin(int BaudRate) {
-      _pending = false;
-    }
-    inline __attribute__((always_inline))
-    void set(byte i) {
-      c = i;
-      _pending = true;
-    }
-    inline __attribute__((always_inline))
-    byte read() {
-      _pending = false;
-      return c;
-    }
-    inline __attribute__((always_inline))
-    bool write(byte i) {
-      return true;
-    }
-    inline __attribute__((always_inline))
-    unsigned available() {
-      if (_pending) {
-        return 1;
-      }
-      return 0;
-    }
-    byte c;
-  private:
-    bool _pending;
-};
-
-FakeSerial fs;
-
-#define  MIDI_CHANNEL  MIDI_CHANNEL_OMNI
-struct VesselSettings : public midi::DefaultSettings {
-  // cppcheck-suppress unusedStructMember
-  static const bool Use1ByteParsing = true;
-  static const int BaudRate = 0;
-};
-
-MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
-
-
 // TODO: custom optimized PIOC handler for PC2 int only.
 // add void PIOC_Handler (void) __attribute__ ((weak)); to WInterrupts.c
 void PIOC_Handler(void) {
@@ -133,6 +88,73 @@ volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
 
+class FakeSerial {
+  public:
+    void begin(int BaudRate) {
+      _pending = false;
+    }
+    inline __attribute__((always_inline))
+    void set(byte i) {
+      c = i;
+      _pending = true;
+    }
+    inline __attribute__((always_inline))
+    byte read() {
+      _pending = false;
+      return c;
+    }
+    inline __attribute__((always_inline))
+    bool write(byte i) {
+      outBuf[++(*outBufReadPtr)] = i;
+    }
+    inline __attribute__((always_inline))
+    unsigned available() {
+      if (_pending) {
+        return 1;
+      }
+      return 0;
+    }
+    byte c;
+  private:
+    bool _pending;
+};
+
+FakeSerial fs;
+
+#define  MIDI_CHANNEL  MIDI_CHANNEL_OMNI
+struct VesselSettings : public midi::DefaultSettings {
+  // cppcheck-suppress unusedStructMember
+  static const bool Use1ByteParsing = true;
+  static const int BaudRate = 0;
+};
+
+MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
+
+inline void handleNoteOn(byte channel, byte note, byte velocity) {
+  flagPin.write(HIGH);
+  MIDI.sendNoteOn(channel, note, velocity);
+}
+
+inline void handleNoteOff(byte channel, byte note, byte velocity) {
+  flagPin.write(HIGH);
+  MIDI.sendNoteOff(channel, note, velocity);
+}
+
+inline void handleControlChange(byte channel, byte number, byte value) {
+  flagPin.write(HIGH);
+  MIDI.sendControlChange(channel, number, value);
+}
+
+inline void handleProgramChange(byte channel, byte number) {
+  flagPin.write(HIGH);
+  MIDI.sendProgramChange(channel, number);
+}
+
+inline void handlePitchBend(byte channel, int bend) {
+  flagPin.write(HIGH);
+  MIDI.sendPitchBend(channel, bend);
+}
+
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
 // bypass all interrupt usage and do polling with our own ringbuffer.
@@ -203,14 +225,7 @@ inline void drainInBuf() {
 inline void drainOutBuf() {
   if (uartRxready()) {
     fs.set(uartRead());
-#ifdef  MIDI_NMI
-    if (MIDI.read()) {
-      flagPin.write(HIGH);
-    }
-#else
-    flagPin.write(HIGH);
-#endif
-    outBuf[++(*outBufReadPtr)] = fs.c;
+    MIDI.read();
     flagPin.write(LOW);
   }
 }
@@ -304,6 +319,11 @@ void setup() {
   resetWritePtrs();
   MIDI.begin(MIDI_CHANNEL_OMNI);
   MIDI.turnThruOff();
+  MIDI.setHandleNoteOn(handleNoteOn);
+  MIDI.setHandleNoteOff(handleNoteOff);
+  MIDI.setHandleControlChange(handleControlChange);
+  MIDI.setHandleProgramChange(handleProgramChange);
+  MIDI.setHandlePitchBend(handlePitchBend);
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
   while (!inInputMode()) { };
