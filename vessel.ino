@@ -130,29 +130,70 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
+#define NMI_SEND(x) { flagPin.write(HIGH); MIDI.x; }
+
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
-  flagPin.write(HIGH);
-  MIDI.sendNoteOn(channel, note, velocity);
+  NMI_SEND(sendNoteOn(channel, note, velocity))
 }
 
 inline void handleNoteOff(byte channel, byte note, byte velocity) {
-  flagPin.write(HIGH);
-  MIDI.sendNoteOff(channel, note, velocity);
+  NMI_SEND(sendNoteOff(channel, note, velocity))
+}
+
+inline void handleAfterTouchPoly(byte channel, byte note, byte pressure) {
+  NMI_SEND(sendPolyPressure(note, pressure, channel))
 }
 
 inline void handleControlChange(byte channel, byte number, byte value) {
-  flagPin.write(HIGH);
-  MIDI.sendControlChange(channel, number, value);
+  NMI_SEND(sendControlChange(channel, number, value))
 }
 
 inline void handleProgramChange(byte channel, byte number) {
-  flagPin.write(HIGH);
-  MIDI.sendProgramChange(channel, number);
+  NMI_SEND(sendProgramChange(channel, number))
+}
+
+inline void handleAfterTouchChannel(byte channel, byte pressure) {
+  NMI_SEND(sendAfterTouch(pressure, channel))
 }
 
 inline void handlePitchBend(byte channel, int bend) {
-  flagPin.write(HIGH);
-  MIDI.sendPitchBend(channel, bend);
+  NMI_SEND(sendPitchBend(channel, bend))
+}
+
+inline void handleTimeCodeQuarterFrame(byte data) {
+  NMI_SEND(sendTimeCodeQuarterFrame(data))
+}
+
+inline void handleSongPosition(unsigned int beats) {
+  NMI_SEND(sendSongPosition(beats))
+}
+
+inline void handleSongSelect(byte songnumber) {
+  NMI_SEND(sendSongSelect(songnumber))
+}
+
+inline void handleTuneRequest() {
+  NMI_SEND(sendTuneRequest())
+}
+
+inline void handleClock(void) {
+  NMI_SEND(sendClock())
+}
+
+inline void handleStart(void) {
+  NMI_SEND(sendStart())
+}
+
+inline void handleContinue(void) {
+  NMI_SEND(sendContinue())
+}
+
+inline void handleStop(void) {
+  NMI_SEND(sendStop())
+}
+
+inline void handleSystemReset(void) {
+  NMI_SEND(sendSystemReset())
 }
 
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
@@ -321,9 +362,20 @@ void setup() {
   MIDI.turnThruOff();
   MIDI.setHandleNoteOn(handleNoteOn);
   MIDI.setHandleNoteOff(handleNoteOff);
+  MIDI.setHandleAfterTouchPoly(handleAfterTouchPoly);
   MIDI.setHandleControlChange(handleControlChange);
   MIDI.setHandleProgramChange(handleProgramChange);
+  MIDI.setHandleAfterTouchChannel(handleAfterTouchChannel);
   MIDI.setHandlePitchBend(handlePitchBend);
+  MIDI.setHandleStart(handleStart);
+  MIDI.setHandleContinue(handleContinue);
+  MIDI.setHandleStop(handleStop);
+  MIDI.setHandleClock(handleClock);
+  MIDI.setHandleSystemReset(handleSystemReset);
+  MIDI.setHandleTuneRequest(handleTuneRequest);
+  MIDI.setHandleTimeCodeQuarterFrame(handleTimeCodeQuarterFrame);
+  MIDI.setHandleSongPosition(handleSongPosition);
+  MIDI.setHandleSongSelect(handleSongSelect);
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
   while (!inInputMode()) { };
