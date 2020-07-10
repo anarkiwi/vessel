@@ -104,7 +104,7 @@ class FakeSerial {
       return c;
     }
     inline __attribute__((always_inline))
-    bool write(byte i) {
+    void write(byte i) {
       outBuf[++(*outBufReadPtr)] = i;
     }
     inline __attribute__((always_inline))
@@ -133,11 +133,11 @@ MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 #define NMI_SEND(x) { flagPin.write(HIGH); MIDI.x; }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
-  NMI_SEND(sendNoteOn(channel, note, velocity))
+  NMI_SEND(sendNoteOn(note, velocity, channel))
 }
 
 inline void handleNoteOff(byte channel, byte note, byte velocity) {
-  NMI_SEND(sendNoteOff(channel, note, velocity))
+  NMI_SEND(sendNoteOff(note, velocity, channel))
 }
 
 inline void handleAfterTouchPoly(byte channel, byte note, byte pressure) {
@@ -145,11 +145,11 @@ inline void handleAfterTouchPoly(byte channel, byte note, byte pressure) {
 }
 
 inline void handleControlChange(byte channel, byte number, byte value) {
-  NMI_SEND(sendControlChange(channel, number, value))
+  NMI_SEND(sendControlChange(number, value, channel))
 }
 
 inline void handleProgramChange(byte channel, byte number) {
-  NMI_SEND(sendProgramChange(channel, number))
+  NMI_SEND(sendProgramChange(number, channel))
 }
 
 inline void handleAfterTouchChannel(byte channel, byte pressure) {
@@ -157,7 +157,7 @@ inline void handleAfterTouchChannel(byte channel, byte pressure) {
 }
 
 inline void handlePitchBend(byte channel, int bend) {
-  NMI_SEND(sendPitchBend(channel, bend))
+  NMI_SEND(sendPitchBend(bend, channel))
 }
 
 inline void handleTimeCodeQuarterFrame(byte data) {
