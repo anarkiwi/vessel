@@ -80,7 +80,7 @@ DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
 DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 
-enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD, ISR_OUTPUT, ISR_OUTPUT_DONE };
+enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD_LEN, ISR_INPUT_CMD_BYTE, ISR_INPUT_CMD_DATA, ISR_OUTPUT, ISR_OUTPUT_DONE };
 
 volatile byte inCmdBuf[IN_BUF_SIZE] = {};
 volatile byte inBuf[IN_BUF_SIZE] = {};
@@ -92,8 +92,8 @@ volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile uint16_t receiveChannelMask = 0xffff;
-volatile byte *cmdLen = inCmdBuf + 1;
-volatile byte *cmdByte = inCmdBuf + 2;
+const volatile byte *cmdLen = inCmdBuf + 1;
+const volatile byte *cmdByte = inCmdBuf + 2;
 
 class FakeSerial {
   public:
@@ -309,31 +309,39 @@ inline void readByte() {
   if (b == vesselCmd) {
     inCmdBufReadPtr = 0;
     inCmdBuf[0] = b;
-    isrMode = ISR_INPUT_CMD;
+    isrMode = ISR_INPUT_CMD_LEN;
   } else {
     inBuf[++inBufReadPtr] = getByte();
   }
 }
 
+inline void readCmdLenByte() {
+  inCmdBuf[++inCmdBufReadPtr] = getByte();
+  if (*cmdLen) {
+    isrMode = ISR_INPUT_CMD_BYTE;
+  } else {
+    isrMode = ISR_INPUT;
+  }
+}
+
 inline void readCmdByte() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (inCmdBufReadPtr > 1) {
-    if (*cmdLen > 1) {
-      if (inCmdBufReadPtr > *cmdLen) {
-        isrMode = ISR_INPUT;
-        switch (*cmdByte) {
-          case 0: {
-              if (*cmdLen == 3) {
-                receiveChannelMask = (inCmdBuf[3] << 8) + inCmdBuf[4];
-              }
-            }
-            break;
-          default:
-            break;
+  isrMode = ISR_INPUT_CMD_DATA;
+}
+
+inline void readCmdData() {
+  inCmdBuf[++inCmdBufReadPtr] = getByte();
+  if (inCmdBufReadPtr > *cmdLen) {
+    isrMode = ISR_INPUT;
+    switch (*cmdByte) {
+      case 0: {
+          if (*cmdLen == 3) {
+            receiveChannelMask = (inCmdBuf[3] << 8) + inCmdBuf[4];
+          }
         }
-      }
-    } else {
-      isrMode = ISR_INPUT;
+        break;
+      default:
+        break;
     }
   }
 }
@@ -345,9 +353,19 @@ inline void IoIsr() {
         readByte();
       }
       break;
-    case ISR_INPUT_CMD:
+    case ISR_INPUT_CMD_LEN:
+      {
+        readCmdLenByte();
+      }
+      break;
+    case ISR_INPUT_CMD_BYTE:
       {
         readCmdByte();
+      }
+      break;
+    case ISR_INPUT_CMD_DATA:
+      {
+        readCmdData();
       }
       break;
     case ISR_OUTPUT:
