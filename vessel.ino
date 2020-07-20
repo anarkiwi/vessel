@@ -80,7 +80,7 @@ DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
 DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 
-enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD_LEN, ISR_INPUT_CMD_BYTE, ISR_INPUT_CMD_DATA, ISR_OUTPUT, ISR_OUTPUT_DONE };
+enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD_BYTE, ISR_INPUT_CMD_DATA, ISR_OUTPUT, ISR_OUTPUT_DONE };
 
 volatile byte inCmdBuf[IN_BUF_SIZE] = {};
 volatile byte inBuf[IN_BUF_SIZE] = {};
@@ -91,9 +91,18 @@ volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
-volatile uint16_t receiveChannelMask = 0xffff;
-const volatile byte *cmdLen = inCmdBuf + 1;
-const volatile byte *cmdByte = inCmdBuf + 2;
+volatile uint16_t receiveChannelMask = 0;
+volatile bool nmiEnabled = false;
+
+void (*cmds[])(void) = {
+  configCmd,
+};
+const byte cmdLens[] = {
+  3,
+};
+byte const *cmdLen = cmdLens;
+volatile byte *cmdByte = inCmdBuf + 1;
+const byte maxCmd = sizeof(cmdLens) - 1;
 
 class FakeSerial {
   public:
@@ -137,7 +146,7 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_SEND(x) { flagPin.write(HIGH); MIDI.x;  }
+#define NMI_SEND(x) { if (nmiEnabled) { flagPin.write(HIGH); } MIDI.x;  }
 #define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_SEND(x) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
@@ -300,7 +309,7 @@ inline void inputMode() {
   }
 }
   
-volatile byte getByte() {
+byte getByte() {
   return REG_PIOD_PDSR; // only need to return LSB
 }
 
@@ -309,40 +318,32 @@ inline void readByte() {
   if (b == vesselCmd) {
     inCmdBufReadPtr = 0;
     inCmdBuf[0] = b;
-    isrMode = ISR_INPUT_CMD_LEN;
+    isrMode = ISR_INPUT_CMD_BYTE;
   } else {
     inBuf[++inBufReadPtr] = getByte();
   }
 }
 
-inline void readCmdLenByte() {
+inline void readCmdByte() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (*cmdLen) {
-    isrMode = ISR_INPUT_CMD_BYTE;
-  } else {
+  if (*cmdByte > maxCmd) {
     isrMode = ISR_INPUT;
+  } else {
+    isrMode = ISR_INPUT_CMD_DATA;
+    cmdLen = cmdLens + *cmdByte;
   }
 }
 
-inline void readCmdByte() {
-  inCmdBuf[++inCmdBufReadPtr] = getByte();
-  isrMode = ISR_INPUT_CMD_DATA;
+inline void configCmd() {
+  receiveChannelMask = (inCmdBuf[2] << 8) + inCmdBuf[3];
+  nmiEnabled = inCmdBuf[4] & 1;
 }
 
 inline void readCmdData() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
   if (inCmdBufReadPtr > *cmdLen) {
     isrMode = ISR_INPUT;
-    switch (*cmdByte) {
-      case 0: {
-          if (*cmdLen == 3) {
-            receiveChannelMask = (inCmdBuf[3] << 8) + inCmdBuf[4];
-          }
-        }
-        break;
-      default:
-        break;
-    }
+    cmds[*cmdByte]();
   }
 }
 
@@ -351,11 +352,6 @@ inline void IoIsr() {
     case ISR_INPUT:
       { 
         readByte();
-      }
-      break;
-    case ISR_INPUT_CMD_LEN:
-      {
-        readCmdLenByte();
       }
       break;
     case ISR_INPUT_CMD_BYTE:
