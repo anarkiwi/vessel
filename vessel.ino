@@ -349,9 +349,9 @@ inline void configCmd() {
   byte configFlags = inCmdBuf[4];
   nmiEnabled = configFlags & 1;
   if (configFlags & 2) {
-    MIDI.turnThruOff();
-  } else {
     MIDI.turnThruOn();
+  } else {
+    MIDI.turnThruOff();
   }
 }
 
