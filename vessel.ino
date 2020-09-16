@@ -21,6 +21,8 @@ void PIOC_Handler(void) {
   }
 }
 
+// The C64 can send us a command by sending 0xf9, then another byte specifying the command number, then any other bytes the command requires.
+// Each command has a fixed number of bytes expected after the command byte.
 const byte vesselCmd = 0xf9;
 
 #define PINDESC(pin)      g_APinDescription[pin].ulPin
@@ -96,9 +98,11 @@ volatile bool nmiEnabled = false;
 
 void (*cmds[])(void) = {
   configCmd,
+  resetCmd,
 };
 const byte cmdLens[] = {
   3,
+  0,
 };
 byte const *cmdLen = cmdLens;
 volatile byte *cmdByte = inCmdBuf + 1;
@@ -334,9 +338,21 @@ inline void readCmdByte() {
   }
 }
 
+inline void resetCmd() {
+  receiveChannelMask = 0;
+  nmiEnabled = false;
+  MIDI.turnThruOff();
+}
+
 inline void configCmd() {
   receiveChannelMask = (inCmdBuf[2] << 8) + inCmdBuf[3];
-  nmiEnabled = inCmdBuf[4] & 1;
+  byte configFlags = inCmdBuf[4];
+  nmiEnabled = configFlags & 1;
+  if (configFlags & 2) {
+    MIDI.turnThruOff();
+  } else {
+    MIDI.turnThruOn();
+  }
 }
 
 inline void readCmdData() {
@@ -438,6 +454,7 @@ void setup() {
   MIDI.setHandleTimeCodeQuarterFrame(handleTimeCodeQuarterFrame);
   MIDI.setHandleSongPosition(handleSongPosition);
   MIDI.setHandleSongSelect(handleSongSelect);
+  resetCmd();
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
   while (!inInputMode()) { };
