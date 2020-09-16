@@ -21,6 +21,8 @@ void PIOC_Handler(void) {
   }
 }
 
+const byte vesselCmd = 0xf9;
+
 #define PINDESC(pin)      g_APinDescription[pin].ulPin
 #define PINPPORT(pin, PPIO)       g_APinDescription[pin].pPort->PPIO
 #define DISABLE_PERIPHERAL_PIN(pin) g_APinDescription[pin].pPort->PIO_PER = g_APinDescription[pin].ulPin;
@@ -78,15 +80,29 @@ DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
 DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 
-enum IsrModeEnum { ISR_INPUT, ISR_OUTPUT, ISR_OUTPUT_DONE };
+enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD_BYTE, ISR_INPUT_CMD_DATA, ISR_OUTPUT, ISR_OUTPUT_DONE };
 
+volatile byte inCmdBuf[IN_BUF_SIZE] = {};
 volatile byte inBuf[IN_BUF_SIZE] = {};
+volatile byte inCmdBufReadPtr = 0;
 volatile byte inBufReadPtr = 0;
 volatile byte inBufWritePtr = 0;
 volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
+volatile uint16_t receiveChannelMask = 0;
+volatile bool nmiEnabled = false;
+
+void (*cmds[])(void) = {
+  configCmd,
+};
+const byte cmdLens[] = {
+  3,
+};
+byte const *cmdLen = cmdLens;
+volatile byte *cmdByte = inCmdBuf + 1;
+const byte maxCmd = sizeof(cmdLens) - 1;
 
 class FakeSerial {
   public:
@@ -130,34 +146,35 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_SEND(x) { flagPin.write(HIGH); MIDI.x; }
+#define NMI_SEND(x) { if (nmiEnabled) { flagPin.write(HIGH); } MIDI.x;  }
+#define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_SEND(x) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
-  NMI_SEND(sendNoteOn(note, velocity, channel))
+  NMI_CHANNEL_SEND(sendNoteOn(note, velocity, channel))
 }
 
 inline void handleNoteOff(byte channel, byte note, byte velocity) {
-  NMI_SEND(sendNoteOff(note, velocity, channel))
+  NMI_CHANNEL_SEND(sendNoteOff(note, velocity, channel))
 }
 
 inline void handleAfterTouchPoly(byte channel, byte note, byte pressure) {
-  NMI_SEND(sendPolyPressure(note, pressure, channel))
+  NMI_CHANNEL_SEND(sendPolyPressure(note, pressure, channel))
 }
 
 inline void handleControlChange(byte channel, byte number, byte value) {
-  NMI_SEND(sendControlChange(number, value, channel))
+  NMI_CHANNEL_SEND(sendControlChange(number, value, channel))
 }
 
 inline void handleProgramChange(byte channel, byte number) {
-  NMI_SEND(sendProgramChange(number, channel))
+  NMI_CHANNEL_SEND(sendProgramChange(number, channel))
 }
 
 inline void handleAfterTouchChannel(byte channel, byte pressure) {
-  NMI_SEND(sendAfterTouch(pressure, channel))
+  NMI_CHANNEL_SEND(sendAfterTouch(pressure, channel))
 }
 
 inline void handlePitchBend(byte channel, int bend) {
-  NMI_SEND(sendPitchBend(bend, channel))
+  NMI_CHANNEL_SEND(sendPitchBend(bend, channel))
 }
 
 inline void handleTimeCodeQuarterFrame(byte data) {
@@ -194,6 +211,11 @@ inline void handleStop(void) {
 
 inline void handleSystemReset(void) {
   NMI_SEND(sendSystemReset())
+}
+
+inline bool channelMasked(byte channel) {
+  uint16_t mask = 1 << (channel - 1);
+  return mask & receiveChannelMask;
 }
 
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
@@ -287,12 +309,42 @@ inline void inputMode() {
   }
 }
   
-volatile byte getByte() {
+byte getByte() {
   return REG_PIOD_PDSR; // only need to return LSB
 }
 
 inline void readByte() {
-  inBuf[++inBufReadPtr] = getByte();
+  volatile byte b = getByte();
+  if (b == vesselCmd) {
+    inCmdBufReadPtr = 0;
+    inCmdBuf[0] = b;
+    isrMode = ISR_INPUT_CMD_BYTE;
+  } else {
+    inBuf[++inBufReadPtr] = getByte();
+  }
+}
+
+inline void readCmdByte() {
+  inCmdBuf[++inCmdBufReadPtr] = getByte();
+  if (*cmdByte > maxCmd) {
+    isrMode = ISR_INPUT;
+  } else {
+    isrMode = ISR_INPUT_CMD_DATA;
+    cmdLen = cmdLens + *cmdByte;
+  }
+}
+
+inline void configCmd() {
+  receiveChannelMask = (inCmdBuf[2] << 8) + inCmdBuf[3];
+  nmiEnabled = inCmdBuf[4] & 1;
+}
+
+inline void readCmdData() {
+  inCmdBuf[++inCmdBufReadPtr] = getByte();
+  if (inCmdBufReadPtr > *cmdLen) {
+    isrMode = ISR_INPUT;
+    cmds[*cmdByte]();
+  }
 }
 
 inline void IoIsr() {
@@ -300,6 +352,16 @@ inline void IoIsr() {
     case ISR_INPUT:
       { 
         readByte();
+      }
+      break;
+    case ISR_INPUT_CMD_BYTE:
+      {
+        readCmdByte();
+      }
+      break;
+    case ISR_INPUT_CMD_DATA:
+      {
+        readCmdData();
       }
       break;
     case ISR_OUTPUT:
