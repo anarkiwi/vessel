@@ -12,6 +12,8 @@
 #include <Arduino.h>
 #include <MIDI.h>
 
+const char versionStr[] = "vessel0";
+
 // TODO: custom optimized PIOC handler for PC2 int only.
 // add void PIOC_Handler (void) __attribute__ ((weak)); to WInterrupts.c
 void PIOC_Handler(void) {
@@ -99,9 +101,11 @@ volatile bool nmiEnabled = false;
 void (*cmds[])(void) = {
   configCmd,
   resetCmd,
+  versionCmd,
 };
 const byte cmdLens[] = {
   3,
+  0,
   0,
 };
 byte const *cmdLen = cmdLens;
@@ -335,6 +339,12 @@ inline void readCmdByte() {
   } else {
     isrMode = ISR_INPUT_CMD_DATA;
     cmdLen = cmdLens + *cmdByte;
+  }
+}
+
+inline void versionCmd() {
+  for (byte i = 0; i < sizeof(versionStr); ++i) {
+    fs.write(versionStr[i]);
   }
 }
 
