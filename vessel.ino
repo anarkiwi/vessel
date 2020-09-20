@@ -154,6 +154,8 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
+#define NMI_WRAP(x) { if (nmiEnabled) { flagPin.write(HIGH); } x; }
+
 #define NMI_SEND(x) { if (nmiEnabled) { flagPin.write(HIGH); } MIDI.x;  }
 #define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_SEND(x) }
 
@@ -343,9 +345,11 @@ inline void readCmdByte() {
 }
 
 inline void versionCmd() {
-  for (byte i = 0; i < sizeof(versionStr); ++i) {
-    fs.write(versionStr[i]);
-  }
+  NMI_WRAP({
+    for (byte i = 0; i < sizeof(versionStr); ++i) {
+      fs.write(versionStr[i]);
+    }})
+  flagPin.write(LOW);
 }
 
 inline void resetCmd() {
