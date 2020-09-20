@@ -339,8 +339,12 @@ inline void readCmdByte() {
   if (*cmdByte > maxCmd) {
     isrMode = ISR_INPUT;
   } else {
-    isrMode = ISR_INPUT_CMD_DATA;
     cmdLen = cmdLens + *cmdByte;
+    if (cmdLen) {
+      isrMode = ISR_INPUT_CMD_DATA;
+    } else {
+      runCmd();
+    }
   }
 }
 
@@ -369,11 +373,15 @@ inline void configCmd() {
   }
 }
 
+inline void runCmd() {
+  isrMode = ISR_INPUT;
+  cmds[*cmdByte]();
+}
+
 inline void readCmdData() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
   if (inCmdBufReadPtr > *cmdLen) {
-    isrMode = ISR_INPUT;
-    cmds[*cmdByte]();
+    runCmd();
   }
 }
 
