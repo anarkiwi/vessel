@@ -25,11 +25,6 @@ implementation via the C64's user port, without requiring the
 C64 to handle an interupt (though the C64 can choose to receive
 one - see below).
 
-The current Vessel implementation is effectively a virtual UART with
-255 byte transmit and receive buffers. Future versions of the driver
-will allow the C64 to offload some MIDI parsing/processing to the driver
-(for example, filter out unwanted MIDI messages).
-
 The C64 provides a shift-register based TTL compatible serial port,
 implemented on a CIA 6526/8520, via the user port. This is
 inconvenient and slow as software must work with one bit at a time.
@@ -62,7 +57,22 @@ from the MIDI port).
 The C64 has no way to know that Vessel has successfully read or
 written a byte, we simply have to keep up with its schedule. An
 Arduino Uno isn't fast enough, but a Due is (with time for other tasks
-while PA2 changes state input/output. 
+while PA2 changes state input/output.
+
+
+C64 to Vessel commands
+----------------------
+
+The C64 can send Vessel a command, by sending byte 0xF9 (not used by MIDI),
+and then a command, and then a fixed number of data bytes (depending on the
+command - unless otherwise specified, a command is followed by 0 data bytes).
+
+By default, NMI on external input is off, all MIDI channels are masked (only
+channel-less messages will be sent to the C64), and MIDI through is disabled.
+
+* 0x00 HH LL CN: Config: channel mask high byte (HH), low byte (LL), and config byte (CN). Config byte bit 0 enables NMI, bit 1 enables MIDI through.
+* 0x01: Reset. Vessel will reset to default config,
+* 0x02: Version. Vessel will return a version string (currently ASCII "vessel0").
 
 
 Upgrading firmware
