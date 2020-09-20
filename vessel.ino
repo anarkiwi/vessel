@@ -155,9 +155,9 @@ struct VesselSettings : public midi::DefaultSettings {
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
 #define NMI_WRAP(x) { if (nmiEnabled) { flagPin.write(HIGH); } x; }
+#define NMI_MIDI_SEND(x) NMI_WRAP(MIDI.x)
 
-#define NMI_SEND(x) { if (nmiEnabled) { flagPin.write(HIGH); } MIDI.x;  }
-#define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_SEND(x) }
+#define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_MIDI_SEND(x) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
   NMI_CHANNEL_SEND(sendNoteOn(note, velocity, channel))
@@ -188,39 +188,39 @@ inline void handlePitchBend(byte channel, int bend) {
 }
 
 inline void handleTimeCodeQuarterFrame(byte data) {
-  NMI_SEND(sendTimeCodeQuarterFrame(data))
+  NMI_MIDI_SEND(sendTimeCodeQuarterFrame(data))
 }
 
 inline void handleSongPosition(unsigned int beats) {
-  NMI_SEND(sendSongPosition(beats))
+  NMI_MIDI_SEND(sendSongPosition(beats))
 }
 
 inline void handleSongSelect(byte songnumber) {
-  NMI_SEND(sendSongSelect(songnumber))
+  NMI_MIDI_SEND(sendSongSelect(songnumber))
 }
 
 inline void handleTuneRequest() {
-  NMI_SEND(sendTuneRequest())
+  NMI_MIDI_SEND(sendTuneRequest())
 }
 
 inline void handleClock(void) {
-  NMI_SEND(sendClock())
+  NMI_MIDI_SEND(sendClock())
 }
 
 inline void handleStart(void) {
-  NMI_SEND(sendStart())
+  NMI_MIDI_SEND(sendStart())
 }
 
 inline void handleContinue(void) {
-  NMI_SEND(sendContinue())
+  NMI_MIDI_SEND(sendContinue())
 }
 
 inline void handleStop(void) {
-  NMI_SEND(sendStop())
+  NMI_MIDI_SEND(sendStop())
 }
 
 inline void handleSystemReset(void) {
-  NMI_SEND(sendSystemReset())
+  NMI_MIDI_SEND(sendSystemReset())
 }
 
 inline bool channelMasked(byte channel) {
@@ -340,7 +340,7 @@ inline void readCmdByte() {
     isrMode = ISR_INPUT;
   } else {
     cmdLen = cmdLens + *cmdByte;
-    if (cmdLen) {
+    if (*cmdLen) {
       isrMode = ISR_INPUT_CMD_DATA;
     } else {
       runCmd();
