@@ -12,7 +12,15 @@
 #include <Arduino.h>
 #include <MIDI.h>
 
-const char versionStr[] = "vessel0";
+const char versionStr[] = {
+  0x16, // V
+  0x05, // E
+  0x13, // S
+  0x13, // S
+  0x05, // E
+  0x0C, // L
+  0x30, // 0
+};
 
 // TODO: custom optimized PIOC handler for PC2 int only.
 // add void PIOC_Handler (void) __attribute__ ((weak)); to WInterrupts.c
@@ -23,9 +31,9 @@ void PIOC_Handler(void) {
   }
 }
 
-// The C64 can send us a command by sending 0xf9, then another byte specifying the command number, then any other bytes the command requires.
+// The C64 can send us a command by sending a reserved cmd byte, then another byte specifying the command number, then any other bytes the command requires.
 // Each command has a fixed number of bytes expected after the command byte.
-const byte vesselCmd = 0xf9;
+const byte vesselCmd = 0xfd;
 
 #define PINDESC(pin)      g_APinDescription[pin].ulPin
 #define PINPPORT(pin, PPIO)       g_APinDescription[pin].pPort->PPIO
@@ -360,6 +368,7 @@ inline void resetCmd() {
   receiveChannelMask = 0;
   nmiEnabled = false;
   MIDI.turnThruOff();
+  resetWritePtrs();
 }
 
 inline void configCmd() {

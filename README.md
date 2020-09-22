@@ -63,7 +63,7 @@ while PA2 changes state input/output.
 C64 to Vessel commands
 ----------------------
 
-The C64 can send Vessel a command, by sending byte 0xF9 (not used by MIDI),
+The C64 can send Vessel a command, by sending byte 0xFD (not used by MIDI),
 and then a command, and then a fixed number of data bytes (depending on the
 command - unless otherwise specified, a command is followed by 0 data bytes).
 
