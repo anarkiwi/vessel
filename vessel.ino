@@ -12,6 +12,17 @@
 #include <Arduino.h>
 #include <MIDI.h>
 
+const char versionStr[] = {
+  0x16, // V
+  0x05, // E
+  0x13, // S
+  0x13, // S
+  0x05, // E
+  0x0C, // L
+  0x30, // 0
+  0x30, // 0
+};
+
 // TODO: custom optimized PIOC handler for PC2 int only.
 // add void PIOC_Handler (void) __attribute__ ((weak)); to WInterrupts.c
 void PIOC_Handler(void) {
@@ -21,7 +32,9 @@ void PIOC_Handler(void) {
   }
 }
 
-const byte vesselCmd = 0xf9;
+// The C64 can send us a command by sending a reserved cmd byte, then another byte specifying the command number, then any other bytes the command requires.
+// Each command has a fixed number of bytes expected after the command byte.
+const byte vesselCmd = 0xfd;
 
 #define PINDESC(pin)      g_APinDescription[pin].ulPin
 #define PINPPORT(pin, PPIO)       g_APinDescription[pin].pPort->PPIO
@@ -96,9 +109,13 @@ volatile bool nmiEnabled = false;
 
 void (*cmds[])(void) = {
   configCmd,
+  resetCmd,
+  versionCmd,
 };
 const byte cmdLens[] = {
   3,
+  0,
+  0,
 };
 byte const *cmdLen = cmdLens;
 volatile byte *cmdByte = inCmdBuf + 1;
@@ -146,8 +163,10 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_SEND(x) { if (nmiEnabled) { flagPin.write(HIGH); } MIDI.x;  }
-#define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_SEND(x) }
+#define NMI_WRAP(x) { if (nmiEnabled) { flagPin.write(HIGH); } x; }
+#define NMI_MIDI_SEND(x) NMI_WRAP(MIDI.x)
+
+#define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_MIDI_SEND(x) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
   NMI_CHANNEL_SEND(sendNoteOn(note, velocity, channel))
@@ -178,39 +197,39 @@ inline void handlePitchBend(byte channel, int bend) {
 }
 
 inline void handleTimeCodeQuarterFrame(byte data) {
-  NMI_SEND(sendTimeCodeQuarterFrame(data))
+  NMI_MIDI_SEND(sendTimeCodeQuarterFrame(data))
 }
 
 inline void handleSongPosition(unsigned int beats) {
-  NMI_SEND(sendSongPosition(beats))
+  NMI_MIDI_SEND(sendSongPosition(beats))
 }
 
 inline void handleSongSelect(byte songnumber) {
-  NMI_SEND(sendSongSelect(songnumber))
+  NMI_MIDI_SEND(sendSongSelect(songnumber))
 }
 
 inline void handleTuneRequest() {
-  NMI_SEND(sendTuneRequest())
+  NMI_MIDI_SEND(sendTuneRequest())
 }
 
 inline void handleClock(void) {
-  NMI_SEND(sendClock())
+  NMI_MIDI_SEND(sendClock())
 }
 
 inline void handleStart(void) {
-  NMI_SEND(sendStart())
+  NMI_MIDI_SEND(sendStart())
 }
 
 inline void handleContinue(void) {
-  NMI_SEND(sendContinue())
+  NMI_MIDI_SEND(sendContinue())
 }
 
 inline void handleStop(void) {
-  NMI_SEND(sendStop())
+  NMI_MIDI_SEND(sendStop())
 }
 
 inline void handleSystemReset(void) {
-  NMI_SEND(sendSystemReset())
+  NMI_MIDI_SEND(sendSystemReset())
 }
 
 inline bool channelMasked(byte channel) {
@@ -329,21 +348,50 @@ inline void readCmdByte() {
   if (*cmdByte > maxCmd) {
     isrMode = ISR_INPUT;
   } else {
-    isrMode = ISR_INPUT_CMD_DATA;
     cmdLen = cmdLens + *cmdByte;
+    if (*cmdLen) {
+      isrMode = ISR_INPUT_CMD_DATA;
+    } else {
+      runCmd();
+    }
   }
+}
+
+inline void versionCmd() {
+  NMI_WRAP({
+    for (byte i = 0; i < sizeof(versionStr); ++i) {
+      fs.write(versionStr[i]);
+    }})
+  flagPin.write(LOW);
+}
+
+inline void resetCmd() {
+  receiveChannelMask = 0;
+  nmiEnabled = false;
+  MIDI.turnThruOff();
+  resetWritePtrs();
 }
 
 inline void configCmd() {
   receiveChannelMask = (inCmdBuf[2] << 8) + inCmdBuf[3];
-  nmiEnabled = inCmdBuf[4] & 1;
+  byte configFlags = inCmdBuf[4];
+  nmiEnabled = configFlags & 1;
+  if (configFlags & 2) {
+    MIDI.turnThruOn();
+  } else {
+    MIDI.turnThruOff();
+  }
+}
+
+inline void runCmd() {
+  isrMode = ISR_INPUT;
+  cmds[*cmdByte]();
 }
 
 inline void readCmdData() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
   if (inCmdBufReadPtr > *cmdLen) {
-    isrMode = ISR_INPUT;
-    cmds[*cmdByte]();
+    runCmd();
   }
 }
 
@@ -438,6 +486,7 @@ void setup() {
   MIDI.setHandleTimeCodeQuarterFrame(handleTimeCodeQuarterFrame);
   MIDI.setHandleSongPosition(handleSongPosition);
   MIDI.setHandleSongSelect(handleSongSelect);
+  resetCmd();
   attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
   while (!inInputMode()) { };
