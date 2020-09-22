@@ -20,6 +20,7 @@ const char versionStr[] = {
   0x05, // E
   0x0C, // L
   0x30, // 0
+  0x30, // 0
 };
 
 // TODO: custom optimized PIOC handler for PC2 int only.
