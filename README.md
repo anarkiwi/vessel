@@ -72,11 +72,13 @@ By default, NMI on external input is off, all MIDI channels are masked and
 all status messages will be masked (no MIDI messages will be sent to the C64)
 and MIDI through is disabled.
 
-* 0x00: Reset. Vessel will reset to default config,
-* 0x01: Version. Vessel will return a version string (currently C64 screen code "vessel00").
-* 0x02 CN: Config flags. Config byte bit 0 enables NMI, bit 1 enables MIDI through.
-* 0x03 HH LL: Channel mask. High byte (HH), low byte (LL) for channels 1 to 16
-* 0x04 HH LL: Status message mask: High byte (HH), low byte (LL) for messages F0 to FF (FD cannot be filtered)
+|byte|command     |arg bytes|description
+|----|------------|---------|--------------------------------------------------------------------------
+|0x00|Reset       |         |Vessel will reset to default config,
+|0x01|Version     |         |Vessel will return a version string (currently C64 screen code "vessel00").
+|0x02|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through.
+|0x03|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16
+|0x04|Status mask |HH LL    |High byte (HH), low byte (LL) for messages F0 to FF
 
 
 Upgrading firmware
