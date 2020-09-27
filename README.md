@@ -13,6 +13,7 @@ Vessel's main points of differences from other C64 MIDI interfaces are:
 * it uses the user port, not the cartridge port
 * it does not use/need any CIA shift register ports
 * it can transfer multiple bytes per transaction (unlike ACIA/6850 designs)
+* the C64 can have configure Vessel to filter MIDI messages to save CPU time
 
 If you are interested in acquiring a Vessel please contact josh@vandervecken.com.
 
@@ -67,12 +68,15 @@ The C64 can send Vessel a command, by sending byte 0xFD (not used by MIDI),
 and then a command, and then a fixed number of data bytes (depending on the
 command - unless otherwise specified, a command is followed by 0 data bytes).
 
-By default, NMI on external input is off, all MIDI channels are masked (only
-channel-less messages will be sent to the C64), and MIDI through is disabled.
+By default, NMI on external input is off, all MIDI channels are masked and
+all status messages will be masked (no MIDI messages will be sent to the C64)
+and MIDI through is disabled.
 
-* 0x00 HH LL CN: Config: channel mask high byte (HH), low byte (LL), and config byte (CN). Config byte bit 0 enables NMI, bit 1 enables MIDI through.
-* 0x01: Reset. Vessel will reset to default config,
-* 0x02: Version. Vessel will return a version string (currently ASCII "vessel0").
+* 0x00: Reset. Vessel will reset to default config,
+* 0x01: Version. Vessel will return a version string (currently C64 screen code "vessel00").
+* 0x02 CN: Config flags. Config byte bit 0 enables NMI, bit 1 enables MIDI through.
+* 0x03 HH LL: Channel mask. High byte (HH), low byte (LL) for channels 1 to 16
+* 0x04 HH LL: Status message mask: High byte (HH), low byte (LL) for messages F0 to FF (FD cannot be filtered)
 
 
 Upgrading firmware
