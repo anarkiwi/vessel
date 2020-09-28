@@ -107,7 +107,6 @@ volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile uint16_t receiveChannelMask = 0;
 volatile uint16_t receiveStatusMask = 0;
 volatile bool nmiEnabled = false;
-volatile byte *inCmdArgs = inCmdBuf + 2;
 
 void (*cmds[])(void) = {
   resetCmd,
@@ -386,7 +385,7 @@ inline void resetCmd() {
 }
 
 inline void configFlagsCmd() {
-  byte configFlags = inCmdArgs[0];
+  byte configFlags = inCmdBuf[2];
   nmiEnabled = configFlags & 1;
   if (configFlags & 2) {
     MIDI.turnThruOn();
@@ -396,7 +395,7 @@ inline void configFlagsCmd() {
 }
 
 inline uint16_t getMask() {
-  return (inCmdArgs[0] << 8) + inCmdArgs[1];
+  return (inCmdBuf[2] << 8) + inCmdBuf[3];
 }
 
 inline void configChannelCmd() {
