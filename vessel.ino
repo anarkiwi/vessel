@@ -107,7 +107,7 @@ volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile uint16_t receiveChannelMask = 0;
 volatile uint16_t receiveStatusMask = 0;
 volatile bool nmiEnabled = false;
-const volatile byte *inCmdArgs = inCmdBuf + 2;
+volatile byte *inCmdArgs = inCmdBuf + 2;
 
 void (*cmds[])(void) = {
   resetCmd,
