@@ -115,6 +115,7 @@ void (*cmds[])(void) = {
   configChannelCmd,
   configStatusCmd,
 };
+void (*cmd)(void) = NULL;
 const byte cmdLens[] = {
   0,
   0,
@@ -122,9 +123,8 @@ const byte cmdLens[] = {
   2,
   2,
 };
-byte const *cmdLen = cmdLens;
-volatile byte *cmdByte = inCmdBuf + 1;
-const byte maxCmd = sizeof(cmdLens) - 1;
+volatile byte cmdLen = 0;
+const byte maxCmd = 4;
 
 class FakeSerial {
   public:
@@ -356,11 +356,13 @@ inline void readByte() {
 
 inline void readCmdByte() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (*cmdByte > maxCmd) {
+  byte cmdNo = inCmdBuf[1];
+  if (cmdNo > maxCmd) {
     isrMode = ISR_INPUT;
   } else {
-    cmdLen = cmdLens + *cmdByte;
-    if (*cmdLen) {
+    cmdLen = cmdLens[cmdNo];
+    cmd = cmds[cmdNo];
+    if (cmdLen) {
       isrMode = ISR_INPUT_CMD_DATA;
     } else {
       runCmd();
@@ -408,12 +410,12 @@ inline void configStatusCmd() {
 
 inline void runCmd() {
   isrMode = ISR_INPUT;
-  cmds[*cmdByte]();
+  (*cmd)();
 }
 
 inline void readCmdData() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (inCmdBufReadPtr > *cmdLen) {
+  if (inCmdBufReadPtr > cmdLen) {
     runCmd();
   }
 }
