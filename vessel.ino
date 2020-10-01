@@ -110,6 +110,7 @@ volatile bool nmiEnabled = false;
 
 void (*cmds[])(void) = {
   resetCmd,
+  purgeCmd,
   versionCmd,
   configFlagsCmd,
   configChannelCmd,
@@ -119,12 +120,13 @@ void (*cmd)(void) = NULL;
 const byte cmdLens[] = {
   0,
   0,
+  0,
   1,
   2,
   2,
 };
 volatile byte cmdLen = 0;
-const byte maxCmd = 4;
+const byte maxCmd = sizeof(cmdLens) - 1;
 
 class FakeSerial {
   public:
@@ -406,6 +408,10 @@ inline void configChannelCmd() {
 
 inline void configStatusCmd() {
   receiveStatusMask = getMask();
+}
+
+inline void purgeCmd() {
+  resetWritePtrs();
 }
 
 inline void runCmd() {

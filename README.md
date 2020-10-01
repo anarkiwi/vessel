@@ -58,7 +58,7 @@ from the MIDI port).
 The C64 has no way to know that Vessel has successfully read or
 written a byte, we simply have to keep up with its schedule. An
 Arduino Uno isn't fast enough, but a Due is (with time for other tasks
-while PA2 changes state input/output.
+while PA2 changes state input/output).
 
 
 C64 to Vessel commands
@@ -75,10 +75,11 @@ and MIDI through is disabled.
 |byte|command     |arg bytes|description
 |----|------------|---------|--------------------------------------------------------------------------
 |0x00|Reset       |         |Vessel will reset to default config,
-|0x01|Version     |         |Vessel will return a version string (currently C64 screen code "vessel00").
-|0x02|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through.
-|0x03|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16
-|0x04|Status mask |HH LL    |High byte (HH), low byte (LL) for messages F0 to FF
+|0x01|Purge       |         |Vessel will discard any data not already sent or received
+|0x02|Version     |         |Vessel will return a version string (currently C64 screen code "vessel00").
+|0x03|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through.
+|0x04|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16
+|0x05|Status mask |HH LL    |High byte (HH), low byte (LL) for messages F0 to FF
 
 
 Upgrading firmware
