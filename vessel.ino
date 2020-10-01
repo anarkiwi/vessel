@@ -105,21 +105,26 @@ volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile uint16_t receiveChannelMask = 0;
+volatile uint16_t receiveStatusMask = 0;
 volatile bool nmiEnabled = false;
 
 void (*cmds[])(void) = {
-  configCmd,
   resetCmd,
   versionCmd,
+  configFlagsCmd,
+  configChannelCmd,
+  configStatusCmd,
 };
+void (*cmd)(void) = NULL;
 const byte cmdLens[] = {
-  3,
   0,
   0,
+  1,
+  2,
+  2,
 };
-byte const *cmdLen = cmdLens;
-volatile byte *cmdByte = inCmdBuf + 1;
-const byte maxCmd = sizeof(cmdLens) - 1;
+volatile byte cmdLen = 0;
+const byte maxCmd = 4;
 
 class FakeSerial {
   public:
@@ -167,6 +172,7 @@ MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 #define NMI_MIDI_SEND(x) NMI_WRAP(MIDI.x)
 
 #define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_MIDI_SEND(x) }
+#define NMI_STATUS_SEND(x, y) if (statusMasked(x)) { NMI_MIDI_SEND(y) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
   NMI_CHANNEL_SEND(sendNoteOn(note, velocity, channel))
@@ -197,39 +203,44 @@ inline void handlePitchBend(byte channel, int bend) {
 }
 
 inline void handleTimeCodeQuarterFrame(byte data) {
-  NMI_MIDI_SEND(sendTimeCodeQuarterFrame(data))
+  NMI_STATUS_SEND(midi::TimeCodeQuarterFrame, sendTimeCodeQuarterFrame(data))
 }
 
 inline void handleSongPosition(unsigned int beats) {
-  NMI_MIDI_SEND(sendSongPosition(beats))
+  NMI_STATUS_SEND(midi::SongPosition, sendSongPosition(beats))
 }
 
 inline void handleSongSelect(byte songnumber) {
-  NMI_MIDI_SEND(sendSongSelect(songnumber))
+  NMI_STATUS_SEND(midi::SongSelect, sendSongSelect(songnumber))
 }
 
 inline void handleTuneRequest() {
-  NMI_MIDI_SEND(sendTuneRequest())
+  NMI_STATUS_SEND(midi::TuneRequest, sendTuneRequest())
 }
 
 inline void handleClock(void) {
-  NMI_MIDI_SEND(sendClock())
+  NMI_STATUS_SEND(midi::Clock, sendClock())
 }
 
 inline void handleStart(void) {
-  NMI_MIDI_SEND(sendStart())
+  NMI_STATUS_SEND(midi::Start, sendStart())
 }
 
 inline void handleContinue(void) {
-  NMI_MIDI_SEND(sendContinue())
+  NMI_STATUS_SEND(midi::Continue, sendContinue())
 }
 
 inline void handleStop(void) {
-  NMI_MIDI_SEND(sendStop())
+  NMI_STATUS_SEND(midi::Stop, sendStop())
 }
 
 inline void handleSystemReset(void) {
-  NMI_MIDI_SEND(sendSystemReset())
+  NMI_STATUS_SEND(midi::SystemReset, sendSystemReset())
+}
+
+inline bool statusMasked(byte status) {
+  uint16_t mask = 1 << (status & 0xf);
+  return mask & receiveStatusMask;
 }
 
 inline bool channelMasked(byte channel) {
@@ -345,11 +356,13 @@ inline void readByte() {
 
 inline void readCmdByte() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (*cmdByte > maxCmd) {
+  byte cmdNo = inCmdBuf[1];
+  if (cmdNo > maxCmd) {
     isrMode = ISR_INPUT;
   } else {
-    cmdLen = cmdLens + *cmdByte;
-    if (*cmdLen) {
+    cmdLen = cmdLens[cmdNo];
+    cmd = cmds[cmdNo];
+    if (cmdLen) {
       isrMode = ISR_INPUT_CMD_DATA;
     } else {
       runCmd();
@@ -367,14 +380,14 @@ inline void versionCmd() {
 
 inline void resetCmd() {
   receiveChannelMask = 0;
+  receiveStatusMask = 0;
   nmiEnabled = false;
   MIDI.turnThruOff();
   resetWritePtrs();
 }
 
-inline void configCmd() {
-  receiveChannelMask = (inCmdBuf[2] << 8) + inCmdBuf[3];
-  byte configFlags = inCmdBuf[4];
+inline void configFlagsCmd() {
+  byte configFlags = inCmdBuf[2];
   nmiEnabled = configFlags & 1;
   if (configFlags & 2) {
     MIDI.turnThruOn();
@@ -383,14 +396,26 @@ inline void configCmd() {
   }
 }
 
+inline uint16_t getMask() {
+  return (inCmdBuf[2] << 8) + inCmdBuf[3];
+}
+
+inline void configChannelCmd() {
+  receiveChannelMask = getMask();
+}
+
+inline void configStatusCmd() {
+  receiveStatusMask = getMask();
+}
+
 inline void runCmd() {
   isrMode = ISR_INPUT;
-  cmds[*cmdByte]();
+  (*cmd)();
 }
 
 inline void readCmdData() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (inCmdBufReadPtr > *cmdLen) {
+  if (inCmdBufReadPtr > cmdLen) {
     runCmd();
   }
 }
