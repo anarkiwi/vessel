@@ -359,7 +359,7 @@ inline void readByte() {
     inCmdBuf[0] = b;
     isrMode = ISR_INPUT_CMD_BYTE;
   } else {
-    inBuf[++inBufReadPtr] = getByte();
+    inBuf[++inBufReadPtr] = b;
   }
 }
 
