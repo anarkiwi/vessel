@@ -80,6 +80,7 @@ and MIDI through is disabled.
 |0x03|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through.
 |0x04|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16
 |0x05|Status mask |HH LL    |High byte (HH), low byte (LL) for messages F0 to FF
+|0x06|Data1 mask  |H        |High nibble for messages 0x00 to 0xEF
 
 
 Upgrading firmware

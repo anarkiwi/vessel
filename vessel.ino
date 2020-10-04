@@ -106,6 +106,7 @@ volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile uint16_t receiveChannelMask = 0;
 volatile uint16_t receiveStatusMask = 0;
+volatile byte receiveData1Mask = 0;
 volatile bool nmiEnabled = false;
 
 void (*cmds[])(void) = {
@@ -115,6 +116,7 @@ void (*cmds[])(void) = {
   configFlagsCmd,
   configChannelCmd,
   configStatusCmd,
+  configData1Cmd,
 };
 void (*cmd)(void) = NULL;
 const byte cmdLens[] = {
@@ -124,6 +126,7 @@ const byte cmdLens[] = {
   1,
   2,
   2,
+  1,
 };
 volatile byte cmdLen = 0;
 const byte maxCmd = sizeof(cmdLens) - 1;
@@ -173,35 +176,35 @@ MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 #define NMI_WRAP(x) { if (nmiEnabled) { flagPin.write(HIGH); } x; }
 #define NMI_MIDI_SEND(x) NMI_WRAP(MIDI.x)
 
-#define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_MIDI_SEND(x) }
+#define NMI_CHANNEL_SEND(x, y) if (channelMasked(channel) && data1Masked(x)) { NMI_MIDI_SEND(y) }
 #define NMI_STATUS_SEND(x, y) if (statusMasked(x)) { NMI_MIDI_SEND(y) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
-  NMI_CHANNEL_SEND(sendNoteOn(note, velocity, channel))
+  NMI_CHANNEL_SEND(midi::NoteOn, sendNoteOn(note, velocity, channel))
 }
 
 inline void handleNoteOff(byte channel, byte note, byte velocity) {
-  NMI_CHANNEL_SEND(sendNoteOff(note, velocity, channel))
+  NMI_CHANNEL_SEND(midi::NoteOff, sendNoteOff(note, velocity, channel))
 }
 
 inline void handleAfterTouchPoly(byte channel, byte note, byte pressure) {
-  NMI_CHANNEL_SEND(sendPolyPressure(note, pressure, channel))
+  NMI_CHANNEL_SEND(midi::AfterTouchPoly, sendPolyPressure(note, pressure, channel))
 }
 
 inline void handleControlChange(byte channel, byte number, byte value) {
-  NMI_CHANNEL_SEND(sendControlChange(number, value, channel))
+  NMI_CHANNEL_SEND(midi::ControlChange, sendControlChange(number, value, channel))
 }
 
 inline void handleProgramChange(byte channel, byte number) {
-  NMI_CHANNEL_SEND(sendProgramChange(number, channel))
+  NMI_CHANNEL_SEND(midi::ProgramChange, sendProgramChange(number, channel))
 }
 
 inline void handleAfterTouchChannel(byte channel, byte pressure) {
-  NMI_CHANNEL_SEND(sendAfterTouch(pressure, channel))
+  NMI_CHANNEL_SEND(midi::AfterTouchChannel, sendAfterTouch(pressure, channel))
 }
 
 inline void handlePitchBend(byte channel, int bend) {
-  NMI_CHANNEL_SEND(sendPitchBend(bend, channel))
+  NMI_CHANNEL_SEND(midi::PitchBend, sendPitchBend(bend, channel))
 }
 
 inline void handleTimeCodeQuarterFrame(byte data) {
@@ -248,6 +251,10 @@ inline bool statusMasked(byte status) {
 inline bool channelMasked(byte channel) {
   uint16_t mask = 1 << (channel - 1);
   return mask & receiveChannelMask;
+}
+
+inline bool data1Masked(byte data1) {
+  return data1 & receiveData1Mask;
 }
 
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
@@ -383,6 +390,7 @@ inline void versionCmd() {
 inline void resetCmd() {
   receiveChannelMask = 0;
   receiveStatusMask = 0;
+  receiveData1Mask = 0;
   nmiEnabled = false;
   MIDI.turnThruOff();
   resetWritePtrs();
@@ -408,6 +416,10 @@ inline void configChannelCmd() {
 
 inline void configStatusCmd() {
   receiveStatusMask = getMask();
+}
+
+inline void configData1Cmd() {
+  receiveData1Mask = inCmdBuf[2];
 }
 
 inline void purgeCmd() {
