@@ -95,6 +95,8 @@ DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 
 enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD_BYTE, ISR_INPUT_CMD_DATA, ISR_OUTPUT, ISR_OUTPUT_DONE };
 
+#define MAX_MIDI_CHANNEL  16
+
 volatile byte inCmdBuf[IN_BUF_SIZE] = {};
 volatile byte inBuf[IN_BUF_SIZE] = {};
 volatile byte inCmdBufReadPtr = 0;
@@ -104,27 +106,34 @@ volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
+volatile bool nmiEnabled = false;
 volatile uint16_t receiveChannelMask = 0;
 volatile uint16_t receiveStatusMask = 0;
-volatile bool nmiEnabled = false;
+byte receiveCommandMask[MAX_MIDI_CHANNEL] = {};
 
 void (*cmds[])(void) = {
   resetCmd,
+  purgeCmd,
+  panicCmd,
   versionCmd,
   configFlagsCmd,
   configChannelCmd,
   configStatusCmd,
+  configCommandCmd,
 };
 void (*cmd)(void) = NULL;
 const byte cmdLens[] = {
   0,
   0,
+  0,
+  0,
   1,
   2,
   2,
+  1,
 };
 volatile byte cmdLen = 0;
-const byte maxCmd = 4;
+const byte maxCmd = sizeof(cmdLens) - 1;
 
 class FakeSerial {
   public:
@@ -171,35 +180,36 @@ MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 #define NMI_WRAP(x) { if (nmiEnabled) { flagPin.write(HIGH); } x; }
 #define NMI_MIDI_SEND(x) NMI_WRAP(MIDI.x)
 
-#define NMI_CHANNEL_SEND(x) if (channelMasked(channel)) { NMI_MIDI_SEND(x) }
-#define NMI_STATUS_SEND(x, y) if (statusMasked(x)) { NMI_MIDI_SEND(y) }
+#define NMI_STATUS_SEND(statusMsg, handler) if (statusMasked(statusMsg)) { NMI_MIDI_SEND(handler) }
+#define NMI_CHANNEL_SEND(channel, handler) if (channelMasked(channel)) { NMI_MIDI_SEND(handler) }
+#define NMI_COMMAND_SEND(command, channel, handler) if (commandMasked(command, channel)) { NMI_CHANNEL_SEND(channel, handler) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
-  NMI_CHANNEL_SEND(sendNoteOn(note, velocity, channel))
+  NMI_COMMAND_SEND(1, channel, sendNoteOn(note, velocity, channel))
 }
 
 inline void handleNoteOff(byte channel, byte note, byte velocity) {
-  NMI_CHANNEL_SEND(sendNoteOff(note, velocity, channel))
+  NMI_COMMAND_SEND(2, channel, sendNoteOff(note, velocity, channel))
 }
 
 inline void handleAfterTouchPoly(byte channel, byte note, byte pressure) {
-  NMI_CHANNEL_SEND(sendPolyPressure(note, pressure, channel))
+  NMI_COMMAND_SEND(3, channel, sendPolyPressure(note, pressure, channel))
 }
 
 inline void handleControlChange(byte channel, byte number, byte value) {
-  NMI_CHANNEL_SEND(sendControlChange(number, value, channel))
+  NMI_COMMAND_SEND(4, channel, sendControlChange(number, value, channel))
 }
 
 inline void handleProgramChange(byte channel, byte number) {
-  NMI_CHANNEL_SEND(sendProgramChange(number, channel))
+  NMI_COMMAND_SEND(5, channel, sendProgramChange(number, channel))
 }
 
 inline void handleAfterTouchChannel(byte channel, byte pressure) {
-  NMI_CHANNEL_SEND(sendAfterTouch(pressure, channel))
+  NMI_COMMAND_SEND(6, channel, sendAfterTouch(pressure, channel))
 }
 
 inline void handlePitchBend(byte channel, int bend) {
-  NMI_CHANNEL_SEND(sendPitchBend(bend, channel))
+  NMI_COMMAND_SEND(7, channel, sendPitchBend(bend, channel))
 }
 
 inline void handleTimeCodeQuarterFrame(byte data) {
@@ -246,6 +256,10 @@ inline bool statusMasked(byte status) {
 inline bool channelMasked(byte channel) {
   uint16_t mask = 1 << (channel - 1);
   return mask & receiveChannelMask;
+}
+
+inline bool commandMasked(byte command, byte channel) {
+  return command & (receiveCommandMask[channel - 1]);
 }
 
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
@@ -350,7 +364,7 @@ inline void readByte() {
     inCmdBuf[0] = b;
     isrMode = ISR_INPUT_CMD_BYTE;
   } else {
-    inBuf[++inBufReadPtr] = getByte();
+    inBuf[++inBufReadPtr] = b;
   }
 }
 
@@ -381,9 +395,18 @@ inline void versionCmd() {
 inline void resetCmd() {
   receiveChannelMask = 0;
   receiveStatusMask = 0;
+  memset(receiveCommandMask, 0, sizeof(receiveCommandMask));
   nmiEnabled = false;
   MIDI.turnThruOff();
+  purgeCmd();
+}
+
+inline void purgeCmd() {
   resetWritePtrs();
+}
+
+inline void panicCmd() {
+  // TODO: not yet implemented.
 }
 
 inline void configFlagsCmd() {
@@ -396,16 +419,30 @@ inline void configFlagsCmd() {
   }
 }
 
-inline uint16_t getMask() {
+inline uint16_t get2bMask() {
   return (inCmdBuf[2] << 8) + inCmdBuf[3];
 }
 
+inline byte getLoNib() {
+  return inCmdBuf[2] & 0x0f;
+}
+
+inline byte getHighNib() {
+  return (inCmdBuf[2] & 0xf0) >> 4;
+}
+
 inline void configChannelCmd() {
-  receiveChannelMask = getMask();
+  receiveChannelMask = get2bMask();
 }
 
 inline void configStatusCmd() {
-  receiveStatusMask = getMask();
+  receiveStatusMask = get2bMask();
+}
+
+inline void configCommandCmd() {
+  byte channel = getLoNib();
+  byte mask = getHighNib() & 0x07;
+  receiveCommandMask[channel] = mask;
 }
 
 inline void runCmd() {
