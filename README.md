@@ -6,7 +6,8 @@ Vessel
 Vessel is a high performance MIDI interface for the C64 based on an
 Arduino Due-like platform, optimized to reduce interrupt load on the
 C64.  Vessel is only compatible with software written specially for it
-as it has its own protocol (see below).
+as it has its own protocol (see below).  There is a reference application,
+[Vessel MIDI Player](https://github.com/anarkiwi/vmp).
 
 Vessel's main points of differences from other C64 MIDI interfaces are:
 
