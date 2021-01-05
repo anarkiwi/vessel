@@ -92,6 +92,7 @@ DigitalPin<C64_PC2> pc2Pin(INPUT, LOW);
 DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
 DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
+DigitalPin<MOSI> statusPin(OUTPUT, LOW);
 
 enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD_BYTE, ISR_INPUT_CMD_DATA, ISR_OUTPUT, ISR_OUTPUT_DONE };
 
@@ -107,6 +108,7 @@ volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile bool nmiEnabled = false;
+volatile bool status = false;
 volatile uint16_t receiveChannelMask = 0;
 volatile uint16_t receiveStatusMask = 0;
 byte receiveCommandMask[MAX_MIDI_CHANNEL] = {};
@@ -134,6 +136,15 @@ const byte cmdLens[] = {
 };
 volatile byte cmdLen = 0;
 const byte maxCmd = sizeof(cmdLens) - 1;
+
+void inline blink() {
+  if (status) {
+    status = LOW;
+  } else {
+    status = HIGH;
+  }
+  statusPin.write(status);
+}
 
 class FakeSerial {
   public:
@@ -326,6 +337,7 @@ inline void drainInBuf() {
   // Avoid buffering, ensure we write direct to UART without waiting.
   if (uartTxready() && inBufWaiting()) {
     uartWrite(inBuf[++inBufWritePtr]);
+    blink();
   }
 }
 
@@ -334,6 +346,7 @@ inline void drainOutBuf() {
     fs.set(uartRead());
     MIDI.read();
     flagPin.write(LOW);
+    blink();
   }
 }
 
@@ -365,6 +378,7 @@ inline void readByte() {
     isrMode = ISR_INPUT_CMD_BYTE;
   } else {
     inBuf[++inBufReadPtr] = b;
+    blink();
   }
 }
 
@@ -505,6 +519,7 @@ inline void outputMode() {
   writeByte();
   if (*outBufReadPtr) {
     isrMode = ISR_OUTPUT;
+    blink();
   } else {
     isrMode = ISR_OUTPUT_DONE;
     resetWritePtrs();
@@ -519,6 +534,7 @@ void dummyIsr() {
 }
 
 void setup() {
+  statusPin.write(LOW);
   SerialUSB.begin(115200);
   Serial2.begin(31250);
   while (Serial2.available()) {
