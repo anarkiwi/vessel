@@ -199,7 +199,8 @@ Upgrading firmware
 The Arduino IDE can be used to reflash Vessel via the onboard USB-C port.
 You should select the right port in the Tools menu before uploading
 (Vessel will show as an Arduino Due, native port). You will also need
-the "MIDI Library" (by Francois Best) installed, via Tools/Manage Libraries.
+the "MIDI Library" (by Francois Best) installed, via Tools/Manage Libraries,
+and support for SAM boards installed (Tools/Board Manager).
 
 NOTE: you will need to add the following to to WInterrupts.c:
 
@@ -210,7 +211,8 @@ On Linux this can be located with the following command.
     josh@vek-x:~$ find .arduino15 -name WInterrupts.c
     .arduino15/packages/arduino/hardware/sam/1.6.12/cores/arduino/WInterrupts.c
 
-If you will upgrade the IDE you will have to change this file again.
+If you will upgrade the IDE you will have to change this file again. Be careful
+to change the WInterrupts.c file in the "sam" directory, NOT the "avr" directory.
 
 
 Vesselmon
