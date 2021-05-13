@@ -335,19 +335,21 @@ inline bool inBufWaiting() {
 
 inline void drainInBuf() {
   // Avoid buffering, ensure we write direct to UART without waiting.
-  if (uartTxready() && inBufWaiting()) {
+  if (inBufWaiting() && uartTxready()) {
     uartWrite(inBuf[++inBufWritePtr]);
     blink();
   }
 }
 
-inline void drainOutBuf() {
+inline bool drainOutBuf() {
   if (uartRxready()) {
     fs.set(uartRead());
     MIDI.read();
     flagPin.write(LOW);
     blink();
+    return true;
   }
+  return false;
 }
 
 inline void resetWritePtrs() {
@@ -361,8 +363,9 @@ inline void inputMode() {
   isrMode = ISR_INPUT;
   interrupts();
   while (inInputMode()) {
-    drainOutBuf();
-    drainInBuf();
+    if (!drainOutBuf()) {
+      drainInBuf();
+    }
   }
 }
   
