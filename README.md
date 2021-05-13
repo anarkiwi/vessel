@@ -197,7 +197,9 @@ Upgrading firmware
 ------------------
 
 The Arduino IDE can be used to reflash Vessel via the onboard USB-C port.
-You should select the right port in the Tools menu before uploading.
+You should select the right port in the Tools menu before uploading
+(Vessel will show as an Arduino Due, native port). You will also need
+the "MIDI Library" (by Francois Best) installed, via Tools/Manage Libraries.
 
 NOTE: you will need to add the following to to WInterrupts.c:
 
