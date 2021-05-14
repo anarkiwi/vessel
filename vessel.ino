@@ -342,10 +342,12 @@ inline void drainInBuf() {
 }
 
 inline bool drainOutBuf() {
-  if (uartRxready()) {
-    fs.set(uartRead());
+  if (fs.available()) {
     MIDI.read();
     flagPin.write(LOW);
+    return true;
+  } else if (uartRxready()) {
+    fs.set(uartRead());
     blink();
     return true;
   }
