@@ -206,13 +206,20 @@ NOTE: you will need to add the following to to WInterrupts.c:
 
     void PIOC_Handler (void) __attribute__ ((weak));
 
-On Linux this can be located with the following command.
+On Linux, WInterrupts.c can be located with:
 
-    josh@vek-x:~$ find .arduino15 -name WInterrupts.c
+    $ find .arduino15/ -name WInterrupts.c | grep sam
     .arduino15/packages/arduino/hardware/sam/1.6.12/cores/arduino/WInterrupts.c
 
-If you will upgrade the IDE you will have to change this file again. Be careful
-to change the WInterrupts.c file in the "sam" directory, NOT the "avr" directory.
+You will also need to change Arduino's default optimization settings. Change
+all references to -Os, to -O2, in platforms.txt.
+
+On Linux, platforms.txt can be located with:
+
+    $ find .arduino15/ -name platform.txt | grep sam
+    .arduino15/packages/arduino/hardware/sam/1.6.12/platform.txt
+
+If you will upgrade the IDE you will have to make these changes again. 
 
 
 Vesselmon
