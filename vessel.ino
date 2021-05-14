@@ -148,7 +148,7 @@ void inline blink() {
 
 class FakeSerial {
   public:
-    void begin(int BaudRate) {
+    void begin(int BaudRate __attribute__((unused))) {
       _pending = false;
     }
     inline __attribute__((always_inline))
@@ -204,7 +204,7 @@ inline void handleNoteOff(byte channel, byte note, byte velocity) {
 }
 
 inline void handleAfterTouchPoly(byte channel, byte note, byte pressure) {
-  NMI_COMMAND_SEND(3, channel, sendPolyPressure(note, pressure, channel))
+  NMI_COMMAND_SEND(3, channel, sendAfterTouch(note, pressure, channel))
 }
 
 inline void handleControlChange(byte channel, byte number, byte value) {
@@ -342,10 +342,12 @@ inline void drainInBuf() {
 }
 
 inline bool drainOutBuf() {
-  if (uartRxready()) {
-    fs.set(uartRead());
+  if (fs.available()) {
     MIDI.read();
     flagPin.write(LOW);
+    return true;
+  } else if (uartRxready()) {
+    fs.set(uartRead());
     blink();
     return true;
   }
