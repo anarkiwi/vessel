@@ -349,7 +349,8 @@ inline bool drainOutBuf() {
     return true;
   } else if (uartRxready()) {
     if (transparent) {
-      fs.write(uartRead());
+      NMI_WRAP(fs.write(uartRead()));
+      flagPin.write(LOW);
     } else {
       fs.set(uartRead());
     }
