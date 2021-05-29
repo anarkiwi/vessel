@@ -10,7 +10,8 @@ as it has its own protocol.
 
 There is a reference application, [Vessel MIDI Player](https://github.com/anarkiwi/vmp/releases),
 and ports of [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases), and
-[Vicficken](https://github.com/anarkiwi/vvf/releases).
+[Vicficken](https://github.com/anarkiwi/vvf/releases), as well as
+[Vessel ASID Player](https://github.com/anarkiwi/vap/releases) which supports ASID.
 
 Vessel's main points of differences from other C64 MIDI interfaces are:
 
