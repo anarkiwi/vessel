@@ -181,9 +181,9 @@ The C64 can send Vessel a command, by sending byte 0xFD (not used by MIDI),
 and then a command, and then a fixed number of data bytes (depending on the
 command - unless otherwise specified, a command is followed by 0 data bytes).
 
-By default, NMI on external input is off, all MIDI channels are masked and
-all status messages will be masked (no MIDI messages will be sent to the C64)
-and MIDI through is disabled.
+By default, transparent mode is off, NMI on external input is off, all MIDI channels
+are masked and all status messages will be masked (no MIDI messages will be sent
+to the C64) and MIDI through is disabled.
 
 |byte|command     |arg bytes|description
 |----|------------|---------|--------------------------------------------------------------------------
@@ -191,7 +191,7 @@ and MIDI through is disabled.
 |0x01|Purge       |         |Vessel will discard any buffered data.
 |0x02|Panic       |         |Reserved for future implementation. Send all notes off on all channels.
 |0x03|Version     |         |Vessel will return a version string (currently C64 screen code "vessel00").
-|0x04|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through.
+|0x04|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through, bit 2 enables transparent (no MIDI parsing) mode.
 |0x05|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16.
 |0x06|Status mask |HH LL    |High byte (HH), low byte (LL) for channel-less messages F0 to FF.
 |0x07|Control mask|CM       |MSB unused, 3 high bits command mask, 4 low bits channel.

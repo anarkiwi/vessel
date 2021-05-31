@@ -108,6 +108,7 @@ volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile bool nmiEnabled = false;
+volatile bool transparent = false;
 volatile bool status = false;
 volatile uint16_t receiveChannelMask = 0;
 volatile uint16_t receiveStatusMask = 0;
@@ -347,7 +348,12 @@ inline bool drainOutBuf() {
     flagPin.write(LOW);
     return true;
   } else if (uartRxready()) {
-    fs.set(uartRead());
+    if (transparent) {
+      NMI_WRAP(fs.write(uartRead()));
+      flagPin.write(LOW);
+    } else {
+      fs.set(uartRead());
+    }
     blink();
     return true;
   }
@@ -416,6 +422,7 @@ inline void resetCmd() {
   receiveStatusMask = 0;
   memset(receiveCommandMask, 0, sizeof(receiveCommandMask));
   nmiEnabled = false;
+  transparent = false;
   MIDI.turnThruOff();
   purgeCmd();
 }
@@ -436,6 +443,7 @@ inline void configFlagsCmd() {
   } else {
     MIDI.turnThruOff();
   }
+  transparent = configFlags & 4;
 }
 
 inline uint16_t get2bMask() {
