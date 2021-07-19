@@ -108,6 +108,7 @@ volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 volatile IsrModeEnum isrMode = ISR_INPUT;
 volatile bool nmiEnabled = false;
+volatile bool nmiStatusOnlyEnabled = false;
 volatile bool transparent = false;
 volatile bool status = false;
 volatile uint16_t receiveChannelMask = 0;
@@ -190,10 +191,12 @@ struct VesselSettings : public midi::DefaultSettings {
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
 #define NMI_WRAP(x) { if (nmiEnabled) { flagPin.write(HIGH); } x; }
-#define NMI_MIDI_SEND(x) NMI_WRAP(MIDI.x)
+#define NMI_CMD_WRAP(x) { if (nmiEnabled && !nmiStatusOnlyEnabled) { flagPin.write(HIGH); } x; }
+#define NMI_MIDI_STATUS_SEND(x) NMI_WRAP(MIDI.x)
+#define NMI_MIDI_CMD_SEND(x) NMI_CMD_WRAP(MIDI.x)
 
-#define NMI_STATUS_SEND(statusMsg, handler) if (statusMasked(statusMsg)) { NMI_MIDI_SEND(handler) }
-#define NMI_CHANNEL_SEND(channel, handler) if (channelMasked(channel)) { NMI_MIDI_SEND(handler) }
+#define NMI_STATUS_SEND(statusMsg, handler) if (statusMasked(statusMsg)) { NMI_MIDI_STATUS_SEND(handler) }
+#define NMI_CHANNEL_SEND(channel, handler) if (channelMasked(channel)) { NMI_MIDI_CMD_SEND(handler) }
 #define NMI_COMMAND_SEND(command, channel, handler) if (commandMasked(command, channel)) { NMI_CHANNEL_SEND(channel, handler) }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
@@ -423,6 +426,7 @@ inline void resetCmd() {
   memset(receiveCommandMask, 0, sizeof(receiveCommandMask));
   nmiEnabled = false;
   transparent = false;
+  nmiStatusOnlyEnabled = false;
   MIDI.turnThruOff();
   purgeCmd();
 }
@@ -444,6 +448,7 @@ inline void configFlagsCmd() {
     MIDI.turnThruOff();
   }
   transparent = configFlags & 4;
+  nmiStatusOnlyEnabled = configFlags & 8;
 }
 
 inline uint16_t get2bMask() {

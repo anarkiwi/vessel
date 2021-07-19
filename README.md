@@ -191,7 +191,7 @@ to the C64) and MIDI through is disabled.
 |0x01|Purge       |         |Vessel will discard any buffered data.
 |0x02|Panic       |         |Reserved for future implementation. Send all notes off on all channels.
 |0x03|Version     |         |Vessel will return a version string (currently C64 screen code "vessel00").
-|0x04|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through, bit 2 enables transparent (no MIDI parsing) mode.
+|0x04|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through, bit 2 enables transparent (no MIDI parsing) mode, bit 3 enables NMI for status messages only (requires bit 0).
 |0x05|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16.
 |0x06|Status mask |HH LL    |High byte (HH), low byte (LL) for channel-less messages F0 to FF.
 |0x07|Control mask|CM       |MSB unused, 3 high bits command mask, 4 low bits channel.
