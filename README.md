@@ -5,13 +5,7 @@ Vessel
 
 Vessel is a high performance MIDI interface for the C64 based on an
 Arduino Due-like platform, optimized to reduce interrupt load on the
-C64.  Vessel is only compatible with software written specially for it
-as it has its own protocol.
-
-There is a reference application, [Vessel MIDI Player](https://github.com/anarkiwi/vmp/releases),
-and ports of SID Wizard - (a basic one, [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases), and an advanced one [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard/tree/m64/add-external-midi-sync) that supports variable external clock),
-[Vicficken](https://github.com/anarkiwi/vvf/releases), as well as
-[Vessel ASID Player](https://github.com/anarkiwi/vap/releases) which supports ASID.
+C64.
 
 Vessel's main points of differences from other C64 MIDI interfaces are:
 
@@ -22,6 +16,17 @@ Vessel's main points of differences from other C64 MIDI interfaces are:
 
 If you are interested in acquiring a Vessel please contact josh@vandervecken.com.
 
+Supported applications
+----------------------
+
+Vessel is only compatible with software written specially for it
+as it has its own protocol. Currently known applications are:
+
+* [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases), and [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard/tree/m64/add-external-midi-sync) - supports variable external clock
+* [Station64](http://www.djindikator.net/c64/)
+* [Vessel ASID Player](https://github.com/anarkiwi/vap/releases)
+* [Vicficken](https://github.com/anarkiwi/vvf/releases)
+* [Vessel MIDI Player](https://github.com/anarkiwi/vmp/releases)
 
 Theory of operation
 -------------------
