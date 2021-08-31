@@ -22,7 +22,7 @@ Supported applications
 Vessel is only compatible with software written specially for it
 as it has its own protocol. Currently known applications are:
 
-* [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases), and [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard/tree/m64/add-external-midi-sync) - supports variable external clock
+* [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases), and [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard/tree/m64/sid-wizard-vessel) - supports variable external clock
 * [Station64](http://www.djindikator.net/c64/)
 * [Vessel ASID Player](https://github.com/anarkiwi/vap/releases)
 * [Vicficken](https://github.com/anarkiwi/vvf/releases)
