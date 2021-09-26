@@ -16,6 +16,8 @@ Vessel's main points of differences from other C64 MIDI interfaces are:
 
 If you are interested in acquiring a Vessel please contact josh@vandervecken.com.
 
+There is a user forum at http://vessel-c64.com/forum/.
+
 Supported applications
 ----------------------
 
