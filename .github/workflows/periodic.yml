@@ -1,5 +1,9 @@
-name: test
-on: [push, pull_request]
+name: periodic test
+on:
+  schedule:
+    # NZST = UTC + 12
+    # Schedule to run at midnight & lunch-time
+    - cron: '0 0,12 * * *'
 jobs:
   test-matrix:
     runs-on: ubuntu-latest
