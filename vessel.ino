@@ -37,6 +37,7 @@ void PIOC_Handler(void) {
 // Each command has a fixed number of bytes expected after the command byte.
 const byte vesselCmd = 0xfd;
 
+#define DISABLE_UART_INT(x) { x->US_IDR = 0xFFFFFFFF; NVIC_ClearPendingIRQ( x ## _IRQn ); NVIC_DisableIRQ( x ## _IRQn ); }
 #define DISABLE_PERIPHERAL_PIN(pin) g_APinDescription[pin].pPort->PIO_PER = g_APinDescription[pin].ulPin;
 
 // PC9 is 41
@@ -272,15 +273,9 @@ inline byte uartRead() {
 }
 
 inline void disableUartInts() {
-  USART2->US_IDR = 0xFFFFFFFF;
-  NVIC_ClearPendingIRQ(USART2_IRQn);
-  NVIC_DisableIRQ(USART2_IRQn);
-  USART1->US_IDR = 0xFFFFFFFF;
-  NVIC_ClearPendingIRQ(USART1_IRQn);
-  NVIC_DisableIRQ(USART1_IRQn);
-  USART0->US_IDR = 0xFFFFFFFF;
-  NVIC_ClearPendingIRQ(USART0_IRQn);
-  NVIC_DisableIRQ(USART0_IRQn);
+  DISABLE_UART_INT(USART2);
+  DISABLE_UART_INT(USART1);
+  DISABLE_UART_INT(USART0);
 }
 
 inline void disablePeripherals() {
