@@ -11,6 +11,7 @@
 
 #include <Arduino.h>
 #include <MIDI.h>
+#include "CRDigitalPin.h"
 
 const char versionStr[] = {
   0x16, // V
@@ -36,34 +37,8 @@ void PIOC_Handler(void) {
 // Each command has a fixed number of bytes expected after the command byte.
 const byte vesselCmd = 0xfd;
 
-#define PINDESC(pin)      g_APinDescription[pin].ulPin
-#define PINPPORT(pin, PPIO)       g_APinDescription[pin].pPort->PPIO
+#define DISABLE_UART_INT(x) { x->US_IDR = 0xFFFFFFFF; NVIC_ClearPendingIRQ( x ## _IRQn ); NVIC_DisableIRQ( x ## _IRQn ); }
 #define DISABLE_PERIPHERAL_PIN(pin) g_APinDescription[pin].pPort->PIO_PER = g_APinDescription[pin].ulPin;
-
-template<uint8_t pin>
-class DigitalPin {
- public:
-  DigitalPin(bool mode, bool value) {
-    pinMode(pin, mode);
-    write(value);
-  }
-  inline __attribute__((always_inline))
-  void high() { write(true); }
-  inline __attribute__((always_inline))
-  void low() { write(false); }
-  inline __attribute__((always_inline))
-  bool read() const {
-    return PINPPORT(pin, PIO_PDSR) & PINDESC(pin);
-  }
-  inline __attribute__((always_inline))
-  void write(bool value) {
-    if (value) {
-      PINPPORT(pin, PIO_SODR) = PINDESC(pin);
-    } else {
-      PINPPORT(pin, PIO_CODR) = PINDESC(pin);
-    }
-  }
-};
 
 // PC9 is 41
 #define C64_PC2 41
@@ -81,6 +56,7 @@ class DigitalPin {
 #define C64_PB5 15
 #define C64_PB6 29
 #define C64_PB7 11
+#define MIDI_USART USART1
 
 const byte c64Pins[] = {C64_PB0, C64_PB1, C64_PB2, C64_PB3, C64_PB4, C64_PB5, C64_PB6, C64_PB7};
 const uint32_t PB_PINS = 0xff; // PIO mask (PIO takes 32 bits, we want the lowest 8 bits)
@@ -281,31 +257,25 @@ inline bool commandMasked(byte command, byte channel) {
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
 // bypass all interrupt usage and do polling with our own ringbuffer.
 inline bool uartTxready() {
-  return USART1->US_CSR & US_CSR_TXRDY;
+  return MIDI_USART->US_CSR & US_CSR_TXRDY;
 }
 
 inline void uartWrite(byte b) {
-  USART1->US_THR = b;
+  MIDI_USART->US_THR = b;
 }
 
 inline bool uartRxready() {
-  return USART1->US_CSR & US_CSR_RXRDY;
+  return MIDI_USART->US_CSR & US_CSR_RXRDY;
 }
 
 inline byte uartRead() {
-  return USART1->US_RHR;
+  return MIDI_USART->US_RHR;
 }
 
 inline void disableUartInts() {
-  USART2->US_IDR = 0xFFFFFFFF;
-  NVIC_ClearPendingIRQ(USART2_IRQn);
-  NVIC_DisableIRQ(USART2_IRQn);
-  USART1->US_IDR = 0xFFFFFFFF;
-  NVIC_ClearPendingIRQ(USART1_IRQn);
-  NVIC_DisableIRQ(USART1_IRQn);
-  USART0->US_IDR = 0xFFFFFFFF;
-  NVIC_ClearPendingIRQ(USART0_IRQn);
-  NVIC_DisableIRQ(USART0_IRQn);
+  DISABLE_UART_INT(USART2);
+  DISABLE_UART_INT(USART1);
+  DISABLE_UART_INT(USART0);
 }
 
 inline void disablePeripherals() {
