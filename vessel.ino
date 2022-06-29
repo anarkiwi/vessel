@@ -11,7 +11,9 @@
 
 #include <Arduino.h>
 #include <MIDI.h>
+#include "pins.h"
 #include "CRDigitalPin.h"
+#include "platform.h"
 
 const char versionStr[] = {
   0x16, // V
@@ -24,42 +26,11 @@ const char versionStr[] = {
   0x30, // 0
 };
 
-// TODO: custom optimized PIOC handler for PC2 int only.
-// add void PIOC_Handler (void) __attribute__ ((weak)); to WInterrupts.c
-void PIOC_Handler(void) {
-  // TODO: calculate PC2 mask.
-  if (PIOC->PIO_ISR & PIO_PC9) {
-    IoIsr();
-  }
-}
-
 // The C64 can send us a command by sending a reserved cmd byte, then another byte specifying the command number, then any other bytes the command requires.
 // Each command has a fixed number of bytes expected after the command byte.
 const byte vesselCmd = 0xfd;
 
-#define DISABLE_UART_INT(x) { x->US_IDR = 0xFFFFFFFF; NVIC_ClearPendingIRQ( x ## _IRQn ); NVIC_DisableIRQ( x ## _IRQn ); }
-#define DISABLE_PERIPHERAL_PIN(pin) g_APinDescription[pin].pPort->PIO_PER = g_APinDescription[pin].ulPin;
-
-// PC9 is 41
-#define C64_PC2 41
-#define C64_PA2 40
-// 74 AKA PA25/MISO
-#define C64_FLAG 74
-#define DATA_DIR 44
-#define CONT_DIR 43
-
-#define C64_PB0 25
-#define C64_PB1 26
-#define C64_PB2 27
-#define C64_PB3 28
-#define C64_PB4 14
-#define C64_PB5 15
-#define C64_PB6 29
-#define C64_PB7 11
-#define MIDI_USART USART1
-
 const byte c64Pins[] = {C64_PB0, C64_PB1, C64_PB2, C64_PB3, C64_PB4, C64_PB5, C64_PB6, C64_PB7};
-const uint32_t PB_PINS = 0xff; // PIO mask (PIO takes 32 bits, we want the lowest 8 bits)
 const uint16_t OUT_BUF_SIZE = 256; // Ring buffer for bytes to send to C64
 const uint16_t IN_BUF_SIZE = 256; // Ring buffer for bytes from C64.
 
@@ -67,12 +38,11 @@ DigitalPin<C64_PA2> pa2Pin(INPUT, LOW);
 DigitalPin<C64_PC2> pc2Pin(INPUT, LOW);
 DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
-DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
-DigitalPin<MOSI> statusPin(OUTPUT, LOW);
-
-enum IsrModeEnum { ISR_INPUT, ISR_INPUT_CMD_BYTE, ISR_INPUT_CMD_DATA, ISR_OUTPUT, ISR_OUTPUT_DONE };
+DigitalPin<STATUS> statusPin(OUTPUT, LOW);
 
 #define MAX_MIDI_CHANNEL  16
+
+void readByte();
 
 volatile byte inCmdBuf[IN_BUF_SIZE] = {};
 volatile byte inBuf[IN_BUF_SIZE] = {};
@@ -82,7 +52,7 @@ volatile byte inBufWritePtr = 0;
 volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
-volatile IsrModeEnum isrMode = ISR_INPUT;
+void (*volatile isrMode)() = readByte;
 volatile bool nmiEnabled = false;
 volatile bool nmiStatusOnlyEnabled = false;
 volatile bool transparent = false;
@@ -90,6 +60,16 @@ volatile bool status = false;
 volatile uint16_t receiveChannelMask = 0;
 volatile uint16_t receiveStatusMask = 0;
 byte receiveCommandMask[MAX_MIDI_CHANNEL] = {};
+
+void noopCmd() {}
+void resetCmd();
+void purgeCmd();
+void panicCmd();
+void versionCmd();
+void configFlagsCmd();
+void configChannelCmd();
+void configStatusCmd();
+void configCommandCmd();
 
 void (*cmds[])(void) = {
   resetCmd,
@@ -116,11 +96,7 @@ volatile byte cmdLen = 0;
 const byte maxCmd = sizeof(cmdLens) - 1;
 
 void inline blink() {
-  if (status) {
-    status = LOW;
-  } else {
-    status = HIGH;
-  }
+  status = !status;
   statusPin.write(status);
 }
 
@@ -253,54 +229,26 @@ inline bool commandMasked(byte command, byte channel) {
   return command & (receiveCommandMask[channel - 1]);
 }
 
-// TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
-// https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
-// bypass all interrupt usage and do polling with our own ringbuffer.
-inline bool uartTxready() {
-  return MIDI_USART->US_CSR & US_CSR_TXRDY;
-}
-
-inline void uartWrite(byte b) {
-  MIDI_USART->US_THR = b;
-}
-
-inline bool uartRxready() {
-  return MIDI_USART->US_CSR & US_CSR_RXRDY;
-}
-
-inline byte uartRead() {
-  return MIDI_USART->US_RHR;
-}
-
-inline void disableUartInts() {
-  DISABLE_UART_INT(USART2);
-  DISABLE_UART_INT(USART1);
-  DISABLE_UART_INT(USART0);
-}
-
-inline void disablePeripherals() {
+inline void initPins() {
   for (byte p = 0; p < sizeof(c64Pins); ++p) {
-    DISABLE_PERIPHERAL_PIN(c64Pins[p]);
+    pinMode(c64Pins[p], INPUT);
   }
-  DISABLE_PERIPHERAL_PIN(C64_PA2);
-  DISABLE_PERIPHERAL_PIN(C64_PC2);
-  DISABLE_PERIPHERAL_PIN(C64_FLAG);
-}
-
-inline bool inInputMode() {
-  return pa2Pin.read();
+  statusPin.write(LOW);
+  flagPin.write(LOW);
 }
 
 inline void setInputMode() {
   dataDirPin.write(LOW);
-  REG_PIOD_ODR |= PB_PINS;
-  REG_PIOD_OWDR |= PB_PINS;
+  setDataDirInput();
 }
 
 inline void setOutputMode() {
   dataDirPin.write(HIGH);
-  REG_PIOD_OER |= PB_PINS;
-  REG_PIOD_OWER |= PB_PINS;
+  setDataDirOutput();
+}
+
+inline bool inInputMode() {
+  return pa2Pin.read();
 }
 
 inline bool inBufWaiting() {
@@ -341,7 +289,7 @@ inline void resetWritePtrs() {
 inline void inputMode() {
   noInterrupts();
   setInputMode();
-  isrMode = ISR_INPUT;
+  isrMode = readByte;
   interrupts();
   while (inInputMode()) {
     if (!drainOutBuf()) {
@@ -350,16 +298,12 @@ inline void inputMode() {
   }
 }
   
-byte getByte() {
-  return REG_PIOD_PDSR; // only need to return LSB
-}
-
 inline void readByte() {
   volatile byte b = getByte();
   if (b == vesselCmd) {
     inCmdBufReadPtr = 0;
     inCmdBuf[0] = b;
-    isrMode = ISR_INPUT_CMD_BYTE;
+    isrMode = readCmdByte;
   } else {
     inBuf[++inBufReadPtr] = b;
     blink();
@@ -370,12 +314,12 @@ inline void readCmdByte() {
   inCmdBuf[++inCmdBufReadPtr] = getByte();
   byte cmdNo = inCmdBuf[1];
   if (cmdNo > maxCmd) {
-    isrMode = ISR_INPUT;
+    isrMode = readByte;
   } else {
     cmdLen = cmdLens[cmdNo];
     cmd = cmds[cmdNo];
     if (cmdLen) {
-      isrMode = ISR_INPUT_CMD_DATA;
+      isrMode = readCmdData;
     } else {
       runCmd();
     }
@@ -448,7 +392,7 @@ inline void configCommandCmd() {
 }
 
 inline void runCmd() {
-  isrMode = ISR_INPUT;
+  isrMode = readByte;
   (*cmd)();
 }
 
@@ -459,42 +403,17 @@ inline void readCmdData() {
   }
 }
 
-inline void IoIsr() {
-  switch (isrMode) {
-    case ISR_INPUT:
-      { 
-        readByte();
-      }
-      break;
-    case ISR_INPUT_CMD_BYTE:
-      {
-        readCmdByte();
-      }
-      break;
-    case ISR_INPUT_CMD_DATA:
-      {
-        readCmdData();
-      }
-      break;
-    case ISR_OUTPUT:
-      {
-        writeByte();
-        // Last byte, and at least one byte written, reset for next cycle.
-        if (outBufWritePtr > *outBufReadPtr) {
-          isrMode = ISR_OUTPUT_DONE;
-          resetWritePtrs();
-        }
-      }
-      break;
-    case ISR_OUTPUT_DONE:
-      break;
-    default:
-      break;
+inline void outputBytes() {
+  writeByte();
+  // Last byte, and at least one byte written, reset for next cycle.
+  if (outBufWritePtr > *outBufReadPtr) {
+    isrMode = noopCmd;
+    resetWritePtrs();
   }
 }
 
-inline void setByte(byte b) {
-  REG_PIOD_ODSR = b;
+inline void IoIsr() {
+  (*isrMode)();
 }
 
 inline void writeByte() {
@@ -506,10 +425,10 @@ inline void outputMode() {
   setOutputMode();
   writeByte();
   if (*outBufReadPtr) {
-    isrMode = ISR_OUTPUT;
+    isrMode = outputBytes;
     blink();
   } else {
-    isrMode = ISR_OUTPUT_DONE;
+    isrMode = noopCmd;
     resetWritePtrs();
   }
   interrupts();
@@ -518,21 +437,9 @@ inline void outputMode() {
   }
 }
 
-void dummyIsr() {
-}
-
 void setup() {
-  statusPin.write(LOW);
-  SerialUSB.begin(115200);
-  Serial2.begin(31250);
-  while (Serial2.available()) {
-    Serial2.read();
-  }
-  disableUartInts();
-  disablePeripherals();
-  REG_PMC_PCER0 |= (1UL << ID_PIOD); // enable PIO controller.
-  controlDirPin.write(LOW);
-  flagPin.write(LOW);
+  initPins();
+  initPlatform();
   resetWritePtrs();
   MIDI.begin(MIDI_CHANNEL_OMNI);
   MIDI.turnThruOff();
@@ -553,7 +460,7 @@ void setup() {
   MIDI.setHandleSongPosition(handleSongPosition);
   MIDI.setHandleSongSelect(handleSongSelect);
   resetCmd();
-  attachInterrupt(digitalPinToInterrupt(C64_PC2), dummyIsr, RISING);
+  attachInterrupt(digitalPinToInterrupt(C64_PC2), IoIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
   while (!inInputMode()) { };
 }
