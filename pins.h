@@ -1,3 +1,4 @@
+#ifdef ARDUINO_ARCH_SAM
 // PC9 is 41
 #define C64_PC2 41
 #define C64_PA2 40
@@ -16,4 +17,24 @@
 #define C64_PB6 29
 #define C64_PB7 11
 
-const uint32_t PB_PINS = 0xff; // PIO mask (PIO takes 32 bits, we want the lowest 8 bits)
+const uint32_t PB_PINS = 0xff;
+#endif
+
+#ifdef ARDUINO_ARCH_SAMD
+#define C64_PC2 A2 // PB09
+#define C64_PA2 A5 // PB02
+#define C64_FLAG A1 // PB08
+#define DATA_DIR SCK // PB11
+#define STATUS MOSI // PB10
+
+#define C64_PB0 11 // PA16
+#define C64_PB1 13 // PA17
+#define C64_PB2 10 // PA18
+#define C64_PB3 12 // PA19
+#define C64_PB4 6 // PA20
+#define C64_PB5 7 // PA21
+#define C64_PB6 SDA // PA22
+#define C64_PB7 SCL // PA23
+
+const uint32_t PB_PINS = 0x00FF0000;
+#endif
