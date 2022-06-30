@@ -1,3 +1,4 @@
+#ifdef ARDUINO_ARCH_SAM
 #define DISABLE_UART_INT(x) { x->US_IDR = 0xFFFFFFFF; NVIC_ClearPendingIRQ( x ## _IRQn ); NVIC_DisableIRQ( x ## _IRQn ); }
 
 DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
@@ -61,3 +62,44 @@ void PIOC_Handler(void) {
     IoIsr();
   }
 }
+#endif
+
+#ifdef ARDUINO_ARCH_SAMD
+inline bool uartTxready() {
+  return sercom0.isDataRegisterEmptyUART();
+}
+
+inline void uartWrite(byte b) {
+  sercom0.writeDataUART(b);
+}
+
+inline bool uartRxready() {
+  return sercom0.availableDataUART();
+}
+
+inline byte uartRead() {
+  return sercom0.readDataUART();
+}
+
+inline void initPlatform() {
+  // see SERCOM::initUART()
+  SERCOM0->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
+}
+
+inline void setDataDirInput() {
+  PORT->Group[PORTA].DIRCLR.reg = PB_PINS;
+}
+
+inline void setDataDirOutput() {
+  PORT->Group[PORTA].DIRCLR.reg = PB_PINS;
+  PORT->Group[PORTA].DIRSET.reg = PB_PINS;
+}
+
+inline byte getByte() {
+  return PORT->Group[PORTA].IN.reg >> 16;
+}
+
+inline void setByte(byte b) {
+  PORT->Group[PORTA].OUT.reg = b << 16;
+}
+#endif
