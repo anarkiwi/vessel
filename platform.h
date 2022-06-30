@@ -83,6 +83,7 @@ inline byte uartRead() {
 
 inline void initPlatform() {
   // see SERCOM::initUART()
+  Serial1.begin(31250);
   SERCOM0->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
 }
 
