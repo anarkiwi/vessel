@@ -1,5 +1,0 @@
-reset-c64
-wait 200
-send
-load run from prg 'bin/defmidi.prg'
-send
