@@ -23,4 +23,4 @@ if [[ "$platform" == "arduino:sam" ]] ; then
     echo "void PIOC_Handler (void) __attribute__ ((weak));" >> $WINT
   fi
 fi
-PATH=~/bin:$PATH arduino-cli compile --fqbn $fqbn vessel.ino
+PATH=~/bin:$PATH arduino-cli -v compile --fqbn $fqbn vessel.ino
