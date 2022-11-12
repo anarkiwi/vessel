@@ -21,11 +21,10 @@ const uint32_t PB_PINS = 0xff;
 #endif
 
 #ifdef ARDUINO_ARCH_SAMD
-#define C64_PC2 A2 // PB09
 #define C64_PA2 A5 // PB02
-#define C64_FLAG A1 // PB08
-#define DATA_DIR SCK // PB11
-#define STATUS MOSI // PB10
+#define C64_FLAG PIN_LED_RXL // PB03
+#define DATA_DIR A1 // PB08
+#define C64_PC2 A2 // PB09
 
 #define C64_PB0 11 // PA16
 #define C64_PB1 13 // PA17

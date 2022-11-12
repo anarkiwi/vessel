@@ -65,26 +65,34 @@ void PIOC_Handler(void) {
 #endif
 
 #ifdef ARDUINO_ARCH_SAMD
+#include <Arduino.h>   // required before wiring_private.h
+#include "wiring_private.h" // pinPeripheral() function
+#define VSERCOM sercom4
+
+Uart MidiSerial(&VSERCOM, SCK, MOSI, SERCOM_RX_PAD_3, UART_TX_PAD_2);
+
 inline bool uartTxready() {
-  return sercom0.isDataRegisterEmptyUART();
+  return VSERCOM.isDataRegisterEmptyUART();
 }
 
 inline void uartWrite(byte b) {
-  sercom0.writeDataUART(b);
+  VSERCOM.writeDataUART(b);
 }
 
 inline bool uartRxready() {
-  return sercom0.availableDataUART();
+  return VSERCOM.availableDataUART();
 }
 
 inline byte uartRead() {
-  return sercom0.readDataUART();
+  return VSERCOM.readDataUART();
 }
 
 inline void initPlatform() {
   // see SERCOM::initUART()
-  Serial1.begin(31250);
-  SERCOM0->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
+  pinPeripheral(SCK, PIO_SERCOM);
+  pinPeripheral(MOSI, PIO_SERCOM);
+  MidiSerial.begin(31250);
+  SERCOM4->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
 }
 
 inline void setDataDirInput() {
