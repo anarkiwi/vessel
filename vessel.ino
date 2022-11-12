@@ -38,7 +38,6 @@ DigitalPin<C64_PA2> pa2Pin(INPUT, LOW);
 DigitalPin<C64_PC2> pc2Pin(INPUT, LOW);
 DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
-DigitalPin<STATUS> statusPin(OUTPUT, LOW);
 
 #define MAX_MIDI_CHANNEL  16
 
@@ -53,12 +52,14 @@ volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
 volatile byte *outBufReadPtr = outBuf;
 void (*volatile isrMode)() = readByte;
-volatile bool nmiEnabled = false;
-volatile bool nmiStatusOnlyEnabled = false;
-volatile bool transparent = false;
-volatile bool status = false;
-volatile uint16_t receiveChannelMask = 0;
-volatile uint16_t receiveStatusMask = 0;
+struct vesselConfigStruct {
+  uint16_t receiveChannelMask;
+  uint16_t receiveStatusMask;
+  bool nmiEnabled;
+  bool nmiStatusOnlyEnabled;
+  bool transparent;
+};
+struct vesselConfigStruct vesselConfig;
 byte receiveCommandMask[MAX_MIDI_CHANNEL] = {};
 
 void noopCmd() {}
@@ -95,10 +96,17 @@ const byte cmdLens[] = {
 volatile byte cmdLen = 0;
 const byte maxCmd = sizeof(cmdLens) - 1;
 
+#ifdef STATUS
+DigitalPin<STATUS> statusPin(OUTPUT, LOW);
+volatile bool status = false;
+
 void inline blink() {
   status = !status;
   statusPin.write(status);
 }
+#else
+#define blink()
+#endif
 
 class FakeSerial {
   public:
@@ -126,9 +134,9 @@ class FakeSerial {
       }
       return 0;
     }
-    byte c;
+    volatile byte c;
   private:
-    bool _pending;
+    volatile bool _pending;
 };
 
 FakeSerial fs;
@@ -142,8 +150,8 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_WRAP(x) { if (nmiEnabled) { flagPin.write(HIGH); } x; }
-#define NMI_CMD_WRAP(x) { if (nmiEnabled && !nmiStatusOnlyEnabled) { flagPin.write(HIGH); } x; }
+#define NMI_WRAP(x) { if (vesselConfig.nmiEnabled) { flagPin.write(HIGH); } x; }
+#define NMI_CMD_WRAP(x) { if (vesselConfig.nmiEnabled && !vesselConfig.nmiStatusOnlyEnabled) { flagPin.write(HIGH); } x; }
 #define NMI_MIDI_STATUS_SEND(x) NMI_WRAP(MIDI.x)
 #define NMI_MIDI_CMD_SEND(x) NMI_CMD_WRAP(MIDI.x)
 
@@ -217,12 +225,12 @@ inline void handleSystemReset(void) {
 
 inline bool statusMasked(byte status) {
   uint16_t mask = 1 << (status & 0xf);
-  return mask & receiveStatusMask;
+  return mask & vesselConfig.receiveStatusMask;
 }
 
 inline bool channelMasked(byte channel) {
   uint16_t mask = 1 << (channel - 1);
-  return mask & receiveChannelMask;
+  return mask & vesselConfig.receiveChannelMask;
 }
 
 inline bool commandMasked(byte command, byte channel) {
@@ -233,7 +241,9 @@ inline void initPins() {
   for (byte p = 0; p < sizeof(c64Pins); ++p) {
     pinMode(c64Pins[p], INPUT);
   }
+  #ifdef STATUS
   statusPin.write(LOW);
+  #endif
   flagPin.write(LOW);
 }
 
@@ -269,7 +279,7 @@ inline bool drainOutBuf() {
     flagPin.write(LOW);
     return true;
   } else if (uartRxready()) {
-    if (transparent) {
+    if (vesselConfig.transparent) {
       NMI_WRAP(fs.write(uartRead()));
       flagPin.write(LOW);
     } else {
@@ -335,12 +345,7 @@ inline void versionCmd() {
 }
 
 inline void resetCmd() {
-  receiveChannelMask = 0;
-  receiveStatusMask = 0;
-  memset(receiveCommandMask, 0, sizeof(receiveCommandMask));
-  nmiEnabled = false;
-  transparent = false;
-  nmiStatusOnlyEnabled = false;
+  memset(&vesselConfig, 0, sizeof(vesselConfig));
   MIDI.turnThruOff();
   purgeCmd();
 }
@@ -355,14 +360,14 @@ inline void panicCmd() {
 
 inline void configFlagsCmd() {
   byte configFlags = inCmdBuf[2];
-  nmiEnabled = configFlags & 1;
+  vesselConfig.nmiEnabled = configFlags & 1;
   if (configFlags & 2) {
     MIDI.turnThruOn();
   } else {
     MIDI.turnThruOff();
   }
-  transparent = configFlags & 4;
-  nmiStatusOnlyEnabled = configFlags & 8;
+  vesselConfig.transparent = configFlags & 4;
+  vesselConfig.nmiStatusOnlyEnabled = configFlags & 8;
 }
 
 inline uint16_t get2bMask() {
@@ -378,11 +383,11 @@ inline byte getHighNib() {
 }
 
 inline void configChannelCmd() {
-  receiveChannelMask = get2bMask();
+  vesselConfig.receiveChannelMask = get2bMask();
 }
 
 inline void configStatusCmd() {
-  receiveStatusMask = get2bMask();
+  vesselConfig.receiveStatusMask = get2bMask();
 }
 
 inline void configCommandCmd() {
