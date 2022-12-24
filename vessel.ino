@@ -50,7 +50,7 @@ volatile byte inBufReadPtr = 0;
 volatile byte inBufWritePtr = 0;
 volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
-volatile byte *outBufReadPtr = outBuf;
+volatile byte outBufReadPtr = 0;
 void (*volatile isrMode)() = readByte;
 struct vesselConfigStruct {
   uint16_t receiveChannelMask;
@@ -111,32 +111,26 @@ void inline blink() {
 class FakeSerial {
   public:
     void begin(int BaudRate __attribute__((unused))) {
-      _pending = false;
     }
     inline __attribute__((always_inline))
-    void set(byte i) {
-      c = i;
-      _pending = true;
+    void qread(byte i) {
+      c[n++] = i;
     }
     inline __attribute__((always_inline))
     byte read() {
-      _pending = false;
-      return c;
+      return c[--n];
     }
     inline __attribute__((always_inline))
     void write(byte i) {
-      outBuf[++(*outBufReadPtr)] = i;
+      outBuf[outBufReadPtr++] = i;
     }
     inline __attribute__((always_inline))
     unsigned available() {
-      if (_pending) {
-        return 1;
-      }
-      return 0;
+      return n;
     }
-    volatile byte c;
   private:
-    volatile bool _pending;
+    volatile byte c[16] = {};
+    volatile byte n = 0;
 };
 
 FakeSerial fs;
@@ -150,8 +144,8 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_WRAP(x) { if (vesselConfig.nmiEnabled) { flagPin.write(HIGH); } x; }
-#define NMI_CMD_WRAP(x) { if (vesselConfig.nmiEnabled && !vesselConfig.nmiStatusOnlyEnabled) { flagPin.write(HIGH); } x; }
+#define NMI_WRAP(x) { if (vesselConfig.nmiEnabled) { flagPin.write(HIGH); x; flagPin.write(LOW); } else { x; } }
+#define NMI_CMD_WRAP(x) { if (!vesselConfig.nmiStatusOnlyEnabled) { NMI_WRAP(x); } }
 #define NMI_MIDI_STATUS_SEND(x) NMI_WRAP(MIDI.x)
 #define NMI_MIDI_CMD_SEND(x) NMI_CMD_WRAP(MIDI.x)
 
@@ -273,18 +267,21 @@ inline void drainInBuf() {
   }
 }
 
+inline bool transparentDrainOutBuf() {
+  if (uartRxready()) {
+    NMI_WRAP(fs.write(uartRead()));
+    blink();
+    return true;
+  }
+  return false;
+}
+
 inline bool drainOutBuf() {
   if (fs.available()) {
     MIDI.read();
-    flagPin.write(LOW);
     return true;
   } else if (uartRxready()) {
-    if (vesselConfig.transparent) {
-      NMI_WRAP(fs.write(uartRead()));
-      flagPin.write(LOW);
-    } else {
-      fs.set(uartRead());
-    }
+    fs.qread(uartRead());
     blink();
     return true;
   }
@@ -293,7 +290,7 @@ inline bool drainOutBuf() {
 
 inline void resetWritePtrs() {
   outBufWritePtr = 0;
-  *outBufReadPtr = 0;
+  outBufReadPtr = 0;
 }
 
 inline void inputMode() {
@@ -301,9 +298,17 @@ inline void inputMode() {
   setInputMode();
   isrMode = readByte;
   interrupts();
-  while (inInputMode()) {
-    if (!drainOutBuf()) {
-      drainInBuf();
+  if (vesselConfig.transparent) {
+    while (inInputMode()) {
+      if (!transparentDrainOutBuf()) {
+        drainInBuf();
+      }
+    }
+  } else {
+    while (inInputMode()) {
+      if (!drainOutBuf()) {
+        drainInBuf();
+      }
     }
   }
 }
@@ -312,7 +317,6 @@ inline void readByte() {
   volatile byte b = getByte();
   if (b == vesselCmd) {
     inCmdBufReadPtr = 0;
-    inCmdBuf[0] = b;
     isrMode = readCmdByte;
   } else {
     inBuf[++inBufReadPtr] = b;
@@ -321,8 +325,7 @@ inline void readByte() {
 }
 
 inline void readCmdByte() {
-  inCmdBuf[++inCmdBufReadPtr] = getByte();
-  byte cmdNo = inCmdBuf[1];
+  byte cmdNo = getByte();
   if (cmdNo > maxCmd) {
     isrMode = readByte;
   } else {
@@ -341,7 +344,6 @@ inline void versionCmd() {
     for (byte i = 0; i < sizeof(versionStr); ++i) {
       fs.write(versionStr[i]);
     }})
-  flagPin.write(LOW);
 }
 
 inline void resetCmd() {
@@ -359,7 +361,7 @@ inline void panicCmd() {
 }
 
 inline void configFlagsCmd() {
-  byte configFlags = inCmdBuf[2];
+  byte configFlags = inCmdBuf[0];
   vesselConfig.nmiEnabled = configFlags & 1;
   if (configFlags & 2) {
     MIDI.turnThruOn();
@@ -371,15 +373,15 @@ inline void configFlagsCmd() {
 }
 
 inline uint16_t get2bMask() {
-  return (inCmdBuf[2] << 8) + inCmdBuf[3];
+  return (inCmdBuf[0] << 8) + inCmdBuf[1];
 }
 
 inline byte getLoNib() {
-  return inCmdBuf[2] & 0x0f;
+  return inCmdBuf[0] & 0x0f;
 }
 
 inline byte getHighNib() {
-  return (inCmdBuf[2] & 0xf0) >> 4;
+  return (inCmdBuf[0] & 0xf0) >> 4;
 }
 
 inline void configChannelCmd() {
@@ -402,18 +404,23 @@ inline void runCmd() {
 }
 
 inline void readCmdData() {
-  inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (inCmdBufReadPtr > cmdLen) {
+  inCmdBuf[inCmdBufReadPtr++] = getByte();
+  if (--cmdLen == 0) {
     runCmd();
   }
+}
+
+inline void resetWrite() {
+  isrMode = noopCmd;
+  resetWritePtrs();
+  drainInBuf();
 }
 
 inline void outputBytes() {
   writeByte();
   // Last byte, and at least one byte written, reset for next cycle.
-  if (outBufWritePtr > *outBufReadPtr) {
-    isrMode = noopCmd;
-    resetWritePtrs();
+  if (--outBufReadPtr == 0) {
+    isrMode = resetWrite;
   }
 }
 
@@ -428,18 +435,15 @@ inline void writeByte() {
 inline void outputMode() {
   noInterrupts();
   setOutputMode();
-  writeByte();
-  if (*outBufReadPtr) {
+  setByte(outBufReadPtr);
+  if (outBufReadPtr) {
     isrMode = outputBytes;
     blink();
   } else {
-    isrMode = noopCmd;
-    resetWritePtrs();
+    isrMode = resetWrite;
   }
   interrupts();
-  while (!inInputMode()) {
-    drainInBuf();
-  }
+  while (!inInputMode()) { };
 }
 
 void setup() {
