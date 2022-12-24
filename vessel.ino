@@ -111,17 +111,14 @@ void inline blink() {
 class FakeSerial {
   public:
     void begin(int BaudRate __attribute__((unused))) {
-      _pending = false;
     }
     inline __attribute__((always_inline))
-    void set(byte i) {
-      c = i;
-      _pending = true;
+    void qread(byte i) {
+      c[n++] = i;
     }
     inline __attribute__((always_inline))
     byte read() {
-      _pending = false;
-      return c;
+      return c[--n];
     }
     inline __attribute__((always_inline))
     void write(byte i) {
@@ -129,14 +126,11 @@ class FakeSerial {
     }
     inline __attribute__((always_inline))
     unsigned available() {
-      if (_pending) {
-        return 1;
-      }
-      return 0;
+      return n;
     }
-    volatile byte c;
   private:
-    volatile bool _pending;
+    volatile byte c[16] = {};
+    volatile byte n = 0;
 };
 
 FakeSerial fs;
@@ -150,8 +144,8 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_WRAP(x) { if (vesselConfig.nmiEnabled) { flagPin.write(HIGH); } x; }
-#define NMI_CMD_WRAP(x) { if (vesselConfig.nmiEnabled && !vesselConfig.nmiStatusOnlyEnabled) { flagPin.write(HIGH); } x; }
+#define NMI_WRAP(x) { if (vesselConfig.nmiEnabled) { flagPin.write(HIGH); x; flagPin.write(LOW); } else { x; } }
+#define NMI_CMD_WRAP(x) { if (!vesselConfig.nmiStatusOnlyEnabled) { NMI_WRAP(x); } }
 #define NMI_MIDI_STATUS_SEND(x) NMI_WRAP(MIDI.x)
 #define NMI_MIDI_CMD_SEND(x) NMI_CMD_WRAP(MIDI.x)
 
@@ -276,7 +270,6 @@ inline void drainInBuf() {
 inline bool transparentDrainOutBuf() {
   if (uartRxready()) {
     NMI_WRAP(fs.write(uartRead()));
-    flagPin.write(LOW);
     blink();
     return true;
   }
@@ -286,10 +279,9 @@ inline bool transparentDrainOutBuf() {
 inline bool drainOutBuf() {
   if (fs.available()) {
     MIDI.read();
-    flagPin.write(LOW);
     return true;
   } else if (uartRxready()) {
-    fs.set(uartRead());
+    fs.qread(uartRead());
     blink();
     return true;
   }
@@ -352,7 +344,6 @@ inline void versionCmd() {
     for (byte i = 0; i < sizeof(versionStr); ++i) {
       fs.write(versionStr[i]);
     }})
-  flagPin.write(LOW);
 }
 
 inline void resetCmd() {
@@ -422,6 +413,7 @@ inline void readCmdData() {
 inline void resetWrite() {
   isrMode = noopCmd;
   resetWritePtrs();
+  drainInBuf();
 }
 
 inline void outputBytes() {
@@ -451,9 +443,7 @@ inline void outputMode() {
     isrMode = resetWrite;
   }
   interrupts();
-  while (!inInputMode()) {
-    drainInBuf();
-  }
+  while (!inInputMode()) { };
 }
 
 void setup() {
