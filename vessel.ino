@@ -312,7 +312,6 @@ inline void readByte() {
   volatile byte b = getByte();
   if (b == vesselCmd) {
     inCmdBufReadPtr = 0;
-    inCmdBuf[0] = b;
     isrMode = readCmdByte;
   } else {
     inBuf[++inBufReadPtr] = b;
@@ -321,8 +320,7 @@ inline void readByte() {
 }
 
 inline void readCmdByte() {
-  inCmdBuf[++inCmdBufReadPtr] = getByte();
-  byte cmdNo = inCmdBuf[1];
+  byte cmdNo = getByte();
   if (cmdNo > maxCmd) {
     isrMode = readByte;
   } else {
@@ -359,7 +357,7 @@ inline void panicCmd() {
 }
 
 inline void configFlagsCmd() {
-  byte configFlags = inCmdBuf[2];
+  byte configFlags = inCmdBuf[0];
   vesselConfig.nmiEnabled = configFlags & 1;
   if (configFlags & 2) {
     MIDI.turnThruOn();
@@ -371,15 +369,15 @@ inline void configFlagsCmd() {
 }
 
 inline uint16_t get2bMask() {
-  return (inCmdBuf[2] << 8) + inCmdBuf[3];
+  return (inCmdBuf[0] << 8) + inCmdBuf[1];
 }
 
 inline byte getLoNib() {
-  return inCmdBuf[2] & 0x0f;
+  return inCmdBuf[0] & 0x0f;
 }
 
 inline byte getHighNib() {
-  return (inCmdBuf[2] & 0xf0) >> 4;
+  return (inCmdBuf[0] & 0xf0) >> 4;
 }
 
 inline void configChannelCmd() {
@@ -402,8 +400,8 @@ inline void runCmd() {
 }
 
 inline void readCmdData() {
-  inCmdBuf[++inCmdBufReadPtr] = getByte();
-  if (inCmdBufReadPtr > cmdLen) {
+  inCmdBuf[inCmdBufReadPtr++] = getByte();
+  if (--cmdLen == 0) {
     runCmd();
   }
 }
