@@ -49,8 +49,6 @@ volatile byte inCmdBufReadPtr = 0;
 volatile byte inBufReadPtr = 0;
 volatile byte inBufWritePtr = 0;
 volatile byte outBuf[OUT_BUF_SIZE] = {};
-volatile byte outBufWritePtr = 0;
-volatile byte outBufReadPtr = 0;
 void (*volatile isrMode)() = readByte;
 struct vesselConfigStruct {
   uint16_t receiveChannelMask;
@@ -58,8 +56,10 @@ struct vesselConfigStruct {
   bool nmiEnabled;
   bool nmiStatusOnlyEnabled;
   bool transparent;
+  volatile byte outBufWritePtr;
+  volatile byte outBufReadPtr;
 };
-struct vesselConfigStruct vesselConfig;
+struct vesselConfigStruct vesselConfig = {};
 byte receiveCommandMask[MAX_MIDI_CHANNEL] = {};
 
 void noopCmd() {}
@@ -122,7 +122,7 @@ class FakeSerial {
     }
     inline __attribute__((always_inline))
     void write(byte i) {
-      outBuf[outBufReadPtr++] = i;
+      outBuf[vesselConfig.outBufReadPtr++] = i;
     }
     inline __attribute__((always_inline))
     unsigned available() {
@@ -289,8 +289,8 @@ inline bool drainOutBuf() {
 }
 
 inline void resetWritePtrs() {
-  outBufWritePtr = 0;
-  outBufReadPtr = 0;
+  vesselConfig.outBufWritePtr = 0;
+  vesselConfig.outBufReadPtr = 0;
 }
 
 inline void inputMode() {
@@ -349,7 +349,6 @@ inline void versionCmd() {
 inline void resetCmd() {
   memset(&vesselConfig, 0, sizeof(vesselConfig));
   MIDI.turnThruOff();
-  purgeCmd();
 }
 
 inline void purgeCmd() {
@@ -419,7 +418,7 @@ inline void resetWrite() {
 inline void outputBytes() {
   writeByte();
   // Last byte, and at least one byte written, reset for next cycle.
-  if (--outBufReadPtr == 0) {
+  if (--vesselConfig.outBufReadPtr == 0) {
     isrMode = resetWrite;
   }
 }
@@ -429,14 +428,14 @@ inline void IoIsr() {
 }
 
 inline void writeByte() {
-  setByte(outBuf[outBufWritePtr++]);
+  setByte(outBuf[vesselConfig.outBufWritePtr++]);
 }
 
 inline void outputMode() {
   noInterrupts();
   setOutputMode();
-  setByte(outBufReadPtr);
-  if (outBufReadPtr) {
+  setByte(vesselConfig.outBufReadPtr);
+  if (vesselConfig.outBufReadPtr) {
     isrMode = outputBytes;
     blink();
   } else {
