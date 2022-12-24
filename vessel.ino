@@ -50,7 +50,7 @@ volatile byte inBufReadPtr = 0;
 volatile byte inBufWritePtr = 0;
 volatile byte outBuf[OUT_BUF_SIZE] = {};
 volatile byte outBufWritePtr = 0;
-volatile byte *outBufReadPtr = outBuf;
+volatile byte outBufReadPtr = 0;
 void (*volatile isrMode)() = readByte;
 struct vesselConfigStruct {
   uint16_t receiveChannelMask;
@@ -125,7 +125,7 @@ class FakeSerial {
     }
     inline __attribute__((always_inline))
     void write(byte i) {
-      outBuf[++(*outBufReadPtr)] = i;
+      outBuf[outBufReadPtr++] = i;
     }
     inline __attribute__((always_inline))
     unsigned available() {
@@ -293,7 +293,7 @@ inline bool drainOutBuf() {
 
 inline void resetWritePtrs() {
   outBufWritePtr = 0;
-  *outBufReadPtr = 0;
+  outBufReadPtr = 0;
 }
 
 inline void inputMode() {
@@ -408,12 +408,16 @@ inline void readCmdData() {
   }
 }
 
+inline void resetWrite() {
+  isrMode = noopCmd;
+  resetWritePtrs();
+}
+
 inline void outputBytes() {
   writeByte();
   // Last byte, and at least one byte written, reset for next cycle.
-  if (outBufWritePtr > *outBufReadPtr) {
-    isrMode = noopCmd;
-    resetWritePtrs();
+  if (--outBufReadPtr == 0) {
+    isrMode = resetWrite;
   }
 }
 
@@ -428,13 +432,12 @@ inline void writeByte() {
 inline void outputMode() {
   noInterrupts();
   setOutputMode();
-  writeByte();
-  if (*outBufReadPtr) {
+  setByte(outBufReadPtr);
+  if (outBufReadPtr) {
     isrMode = outputBytes;
     blink();
   } else {
-    isrMode = noopCmd;
-    resetWritePtrs();
+    isrMode = resetWrite;
   }
   interrupts();
   while (!inInputMode()) {
