@@ -273,18 +273,23 @@ inline void drainInBuf() {
   }
 }
 
+inline bool transparentDrainOutBuf() {
+  if (uartRxready()) {
+    NMI_WRAP(fs.write(uartRead()));
+    flagPin.write(LOW);
+    blink();
+    return true;
+  }
+  return false;
+}
+
 inline bool drainOutBuf() {
   if (fs.available()) {
     MIDI.read();
     flagPin.write(LOW);
     return true;
   } else if (uartRxready()) {
-    if (vesselConfig.transparent) {
-      NMI_WRAP(fs.write(uartRead()));
-      flagPin.write(LOW);
-    } else {
-      fs.set(uartRead());
-    }
+    fs.set(uartRead());
     blink();
     return true;
   }
@@ -301,9 +306,17 @@ inline void inputMode() {
   setInputMode();
   isrMode = readByte;
   interrupts();
-  while (inInputMode()) {
-    if (!drainOutBuf()) {
-      drainInBuf();
+  if (vesselConfig.transparent) {
+    while (inInputMode()) {
+      if (!transparentDrainOutBuf()) {
+        drainInBuf();
+      }
+    }
+  } else {
+    while (inInputMode()) {
+      if (!drainOutBuf()) {
+        drainInBuf();
+      }
     }
   }
 }
