@@ -21,10 +21,13 @@ const uint32_t PB_PINS = 0xff;
 #endif
 
 #ifdef ARDUINO_ARCH_SAMD
-#define C64_PA2 A5 // PB02
-#define C64_FLAG PIN_LED_RXL // PB03
-#define DATA_DIR A1 // PB08
+
+// https://learn.sparkfun.com/tutorials/samd21-minidev-breakout-hookup-guide/samd21-dev-breakout-overview
 #define C64_PC2 A2 // PB09
+#define C64_PA2 A1 // PB08
+#define C64_FLAG 31 // PB23
+#define DATA_DIR 30 // PB22
+#define STATUS A5 // PB02
 
 #define C64_PB0 11 // PA16
 #define C64_PB1 13 // PA17
