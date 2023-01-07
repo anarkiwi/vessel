@@ -67,9 +67,16 @@ void PIOC_Handler(void) {
 #ifdef ARDUINO_ARCH_SAMD
 #include <Arduino.h>   // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
+
+// https://learn.sparkfun.com/tutorials/samd21-minidev-breakout-hookup-guide/setting-up-arduino
+// https://learn.sparkfun.com/tutorials/adding-more-sercom-ports-for-samd-boards/all
+
+#define MIDI_RX SCK
+#define MIDI_TX MOSI
+#define SERCOM SERCOM4
 #define VSERCOM sercom4
 
-Uart MidiSerial(&VSERCOM, SCK, MOSI, SERCOM_RX_PAD_3, UART_TX_PAD_2);
+Uart MidiSerial(&VSERCOM, MIDI_RX, MIDI_TX, SERCOM_RX_PAD_3, UART_TX_PAD_2);
 
 inline bool uartTxready() {
   return VSERCOM.isDataRegisterEmptyUART();
@@ -89,10 +96,10 @@ inline byte uartRead() {
 
 inline void initPlatform() {
   // see SERCOM::initUART()
-  pinPeripheral(SCK, PIO_SERCOM);
-  pinPeripheral(MOSI, PIO_SERCOM);
+  pinPeripheral(MIDI_TX, PIO_SERCOM);
+  pinPeripheral(MIDI_RX, PIO_SERCOM);
   MidiSerial.begin(31250);
-  SERCOM4->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
+  SERCOM->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
 }
 
 inline void setDataDirInput() {
