@@ -98,6 +98,9 @@ inline void initPlatform() {
   // see SERCOM::initUART()
   pinPeripheral(MIDI_TX, PIO_SERCOM);
   pinPeripheral(MIDI_RX, PIO_SERCOM);
+  pinPeripheral(DATA_DIR, PIO_OUTPUT);
+  pinPeripheral(C64_FLAG, PIO_OUTPUT);
+  pinPeripheral(C64_PA2, PIO_INPUT);
   MidiSerial.begin(31250);
   SERCOM->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
 }
