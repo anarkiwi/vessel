@@ -4,7 +4,7 @@ Vessel
 ![alt text](vessel.jpg)
 
 Vessel is a high performance MIDI interface for the C64 based on an
-Arduino Due-like platform, optimized to reduce interrupt load on the
+Arduino SAM/D/3X-like platform, optimized to reduce interrupt load on the
 C64.
 
 Vessel's main points of differences from other C64 MIDI interfaces are:
@@ -203,8 +203,17 @@ to the C64) and MIDI through is disabled.
 |0x07|Control mask|CM       |MSB unused, 3 high bits command mask, 4 low bits channel.
 
 
-Upgrading firmware
-------------------
+Upgrading firmware (SAMD21 hardware)
+------------------------------------
+
+The Arduino IDE can be used to reflash Vessel via the onboard USB-C port.
+You should select the right port in the Tools menu before uploading
+(Vessel will show as an Arduino Zero, native port). You will also need
+the "MIDI Library" (by Francois Best) installed, via Tools/Manage Libraries.
+
+
+Upgrading firmware (old SAM3X)
+------------------------------
 
 The Arduino IDE can be used to reflash Vessel via the onboard USB-C port.
 You should select the right port in the Tools menu before uploading
