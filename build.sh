@@ -6,7 +6,7 @@ urls=https://raw.githubusercontent.com/sparkfun/Arduino_Boards/master/IDE_Board_
 
 set -e
 sudo apt-get update && sudo apt-get install wget unzip
-wget -O/tmp/ide.zip https://downloads.arduino.cc/arduino-ide/arduino-ide_2.0.4_Linux_64bit.zip
+wget -O/tmp/ide.zip https://downloads.arduino.cc/arduino-ide/arduino-ide_2.0.2_Linux_64bit.zip
 unzip /tmp/ide.zip
 mkdir ~/bin
 ln -s ~/arduino*/arduino-ide ~/bin/arduino
@@ -23,4 +23,4 @@ if [[ "$platform" == "arduino:sam" ]] ; then
     echo "void PIOC_Handler (void) __attribute__ ((weak));" >> $WINT
   fi
 fi
-PATH=~/bin:$PATH arduino-cli -v compile --fqbn $fqbn vessel.ino
+PATH=~/bin:$PATH arduino-cli compile --fqbn $fqbn vessel.ino

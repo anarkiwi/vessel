@@ -16,8 +16,6 @@ jobs:
           - arduino-platform: "SparkFun:samd"
             fqbn: "SparkFun:samd:samd21_dev"
     steps:
-      - name: Checkout
-        uses: actions/checkout@master
-      - name: Build
-        run: |
+      - uses: actions/checkout@v3
+      - run: |
           ./build.sh ${{ matrix.arduino-platform }} ${{ matrix.fqbn }}
