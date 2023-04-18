@@ -5,12 +5,12 @@ jobs:
     runs-on: ubuntu-latest
     strategy:
       matrix:
-        arduino-platform: ["arduino:sam", "SparkFun:samd"]
+        arduino-platform: ["arduino:sam", "arduino:samd"]
         include:
           - arduino-platform: "arduino:sam"
             fqbn: "arduino:sam:arduino_due_x"
-          - arduino-platform: "SparkFun:samd"
-            fqbn: "SparkFun:samd:samd21_dev"
+          - arduino-platform: "arduino:samd"
+            fqbn: "arduino:samd:arduino_zero_native"
     steps:
       - uses: actions/checkout@v3
       - run: |
