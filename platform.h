@@ -6,20 +6,36 @@ DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
 // bypass all interrupt usage and do polling with our own ringbuffer.
+// inline bool uartTxready() {
+//   return USART1->US_CSR & US_CSR_TXRDY;
+// }
+
+// inline void uartWrite(byte b) {
+//   USART1->US_THR = b;
+// }
+
+// inline bool uartRxready() {
+//   return USART1->US_CSR & US_CSR_RXRDY;
+// }
+
+// inline byte uartRead() {
+//   return USART1->US_RHR;
+// }
+
 inline bool uartTxready() {
-  return USART1->US_CSR & US_CSR_TXRDY;
+  return true;
 }
 
 inline void uartWrite(byte b) {
-  USART1->US_THR = b;
+  UMIDI.write(b);
 }
 
 inline bool uartRxready() {
-  return USART1->US_CSR & US_CSR_RXRDY;
+  return UMIDI.available();
 }
 
 inline byte uartRead() {
-  return USART1->US_RHR;
+  return UMIDI.read();
 }
 
 inline void initPlatform() {

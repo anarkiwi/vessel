@@ -8,12 +8,211 @@
 
 // THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+#include "USB-MIDI.h"
+#include <MIDI.h>
+
+enum MidiType: uint8_t
+{
+    InvalidType           = 0x00,    ///< For notifying errors
+    NoteOff               = 0x80,    ///< Channel Message - Note Off
+    NoteOn                = 0x90,    ///< Channel Message - Note On
+    AfterTouchPoly        = 0xA0,    ///< Channel Message - Polyphonic AfterTouch
+    ControlChange         = 0xB0,    ///< Channel Message - Control Change / Channel Mode
+    ProgramChange         = 0xC0,    ///< Channel Message - Program Change
+    AfterTouchChannel     = 0xD0,    ///< Channel Message - Channel (monophonic) AfterTouch
+    PitchBend             = 0xE0,    ///< Channel Message - Pitch Bend
+    SystemExclusive       = 0xF0,    ///< System Exclusive
+	SystemExclusiveStart  = SystemExclusive,   ///< System Exclusive Start
+    TimeCodeQuarterFrame  = 0xF1,    ///< System Common - MIDI Time Code Quarter Frame
+    SongPosition          = 0xF2,    ///< System Common - Song Position Pointer
+    SongSelect            = 0xF3,    ///< System Common - Song Select
+    Undefined_F4          = 0xF4,
+    Undefined_F5          = 0xF5,
+    TuneRequest           = 0xF6,    ///< System Common - Tune Request
+	SystemExclusiveEnd    = 0xF7,    ///< System Exclusive End
+    Clock                 = 0xF8,    ///< System Real Time - Timing Clock
+    Undefined_F9          = 0xF9,
+    Tick                  = Undefined_F9, ///< System Real Time - Timing Tick (1 tick = 10 milliseconds)
+    Start                 = 0xFA,    ///< System Real Time - Start
+    Continue              = 0xFB,    ///< System Real Time - Continue
+    Stop                  = 0xFC,    ///< System Real Time - Stop
+    Undefined_FD          = 0xFD,
+    ActiveSensing         = 0xFE,    ///< System Real Time - Active Sensing
+    SystemReset           = 0xFF,    ///< System Real Time - System Reset
+};
+
+
+static uint8_t type2cin[][2] = { {MidiType::InvalidType,0}, {MidiType::NoteOff,8}, {MidiType::NoteOn,9}, {MidiType::AfterTouchPoly,0xA}, {MidiType::ControlChange,0xB}, {MidiType::ProgramChange,0xC}, {MidiType::AfterTouchChannel,0xD}, {MidiType::PitchBend,0xE} };
+
+static uint8_t system2cin[][2] = { {MidiType::SystemExclusive,0}, {MidiType::TimeCodeQuarterFrame,2}, {MidiType::SongPosition,3}, {MidiType::SongSelect,2}, {0,0}, {0,0}, {MidiType::TuneRequest,5}, {MidiType::SystemExclusiveEnd,0}, {MidiType::Clock,0xF}, {0,0}, {MidiType::Start,0xF}, {MidiType::Continue,0xF}, {MidiType::Stop,0xF}, {0,0}, {MidiType::ActiveSensing,0xF}, {MidiType::SystemReset,0xF} };
+
+static byte cin2Len[][2] = { {0,0}, {1,0}, {2,2}, {3,3}, {4,0}, {5,0}, {6,0}, {7,0}, {8,3}, {9,3}, {10,3}, {11,3}, {12,2}, {13,2}, {14,3}, {15,1} };
+
+#define GETCABLENUMBER(packet) (packet.header >> 4);
+#define GETCIN(packet) (packet.header & 0x0f);
+#define MAKEHEADER(cn, cin) (((cn & 0x0f) << 4) | cin)
+#define RXBUFFER_PUSHBACK1 { mRxBuffer[mRxLength++] = mPacket.byte1; }
+#define RXBUFFER_PUSHBACK2 { mRxBuffer[mRxLength++] = mPacket.byte1; mRxBuffer[mRxLength++] = mPacket.byte2; }
+#define RXBUFFER_PUSHBACK3 { mRxBuffer[mRxLength++] = mPacket.byte1; mRxBuffer[mRxLength++] = mPacket.byte2; mRxBuffer[mRxLength++] = mPacket.byte3; }
+
+#define RXBUFFER_POPFRONT(byte) auto byte = mRxBuffer[mRxIndex++]; mRxLength--;
+#define SENDMIDI(packet) { MidiUSB.sendMIDI(packet); MidiUSB.flush(); }
+
+class usbMidiTransportXX
+{
+private:
+    byte mTxBuffer[4];
+    size_t mTxIndex;
+    MidiType mTxStatus;
+
+    byte mRxBuffer[4];
+    size_t mRxLength;
+    size_t mRxIndex;
+
+    midiEventPacket_t mPacket;
+    uint8_t cableNumber;
+    
+public:
+	usbMidiTransportXX(uint8_t cableNumber = 0)
+	{
+        this->cableNumber = cableNumber;
+	};
+
+    
+    static const bool thruActivated = false;
+
+	void begin()
+	{
+        mTxIndex = 0;
+        mRxIndex = 0;
+        mRxLength = 0;
+    };
+
+    void end()
+    {
+    }
+
+	bool beginTransmission(MidiType status)
+	{
+        mTxStatus = status;
+        
+        byte cin = 0;
+        if (status < SystemExclusive) {
+            // Non System messages
+            cin = type2cin[((status & 0xF0) >> 4) - 7][1];
+            mPacket.header = MAKEHEADER(cableNumber, cin);
+        }
+        else {
+            // Only System messages
+            cin = system2cin[status & 0x0F][1];
+            mPacket.header = MAKEHEADER(cableNumber, cin);
+        }
+        
+        mPacket.byte1 = mPacket.byte2 = mPacket.byte3  = 0;
+        mTxIndex = 0;
+
+        return true;
+	};
+
+	void write(byte byte)
+	{
+        if (mTxStatus != MidiType::SystemExclusive) {
+            if (mTxIndex == 0)      mPacket.byte1 = byte;
+            else if (mTxIndex == 1) mPacket.byte2 = byte;
+            else if (mTxIndex == 2) mPacket.byte3 = byte;
+        }
+        else if (byte == MidiType::SystemExclusiveStart) {
+            mPacket.header = MAKEHEADER(cableNumber, 0x04);
+            mPacket.byte1 = byte;
+        }
+        else // SystemExclusiveEnd or SysEx data
+        {
+            auto i = mTxIndex % 3;
+            if (byte == MidiType::SystemExclusiveEnd)
+                mPacket.header = MAKEHEADER(cableNumber, (0x05 + i));
+            
+            if (i == 0) {
+                mPacket.byte1 = byte; mPacket.byte2 = mPacket.byte3 = 0x00;
+            }
+            else if (i == 1) {
+                mPacket.byte2 = byte; mPacket.byte3 = 0x00;
+            }
+            else if (i == 2) {
+                mPacket.byte3 = byte;
+                if (byte != MidiType::SystemExclusiveEnd)
+                    SENDMIDI(mPacket);
+            }
+        }
+        mTxIndex++;
+    };
+
+	void endTransmission()
+	{
+        SENDMIDI(mPacket);
+	};
+
+	byte read()
+	{
+        RXBUFFER_POPFRONT(byte);
+		return byte;
+	};
+
+	unsigned available()
+	{
+        // consume mRxBuffer first, before getting a new packet
+        if (mRxLength > 0)
+            return mRxLength;
+
+        mRxIndex = 0;
+        
+        mPacket = MidiUSB.read();
+        if (mPacket.header != 0) {
+            auto cn  = GETCABLENUMBER(mPacket);
+            if (cn != cableNumber)
+                return 0;
+ 
+            auto cin = GETCIN(mPacket);
+            auto len = cin2Len[cin][1];
+            switch (len) {
+                case 0:
+                    if (cin == 0x4 || cin == 0x7)
+                        RXBUFFER_PUSHBACK3
+                    else if (cin == 0x5)
+                        RXBUFFER_PUSHBACK1
+                    else if (cin == 0x6)
+                        RXBUFFER_PUSHBACK2
+                    break;
+                case 1:
+                    RXBUFFER_PUSHBACK1
+                    break;
+                case 2:
+                    RXBUFFER_PUSHBACK2
+                    break;
+                case 3:
+                    RXBUFFER_PUSHBACK3
+                    break;
+                default:
+                    break; // error
+            }
+        }
+
+        return mRxLength;
+	};
+};
+
+usbMidiTransportXX UMIDI(0);
 
 #include <Arduino.h>
-#include <MIDI.h>
 #include "pins.h"
 #include "CRDigitalPin.h"
 #include "platform.h"
+
+class usbMidiTransportX : public usbMidi::usbMidiTransport {};
+
+
+// usbMidi::usbMidiTransport umidi(0);
+
+
 
 const char versionStr[] = {
   0x16, // V
@@ -449,6 +648,7 @@ void setup() {
   initPins();
   initPlatform();
   resetWritePtrs();
+  UMIDI.begin();
   MIDI.begin(MIDI_CHANNEL_OMNI);
   MIDI.turnThruOff();
   MIDI.setHandleNoteOn(handleNoteOn);
