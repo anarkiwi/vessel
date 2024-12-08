@@ -27,15 +27,15 @@ inline bool uartTxready() {
 }
 
 inline void uartWrite(byte b) {
-  UMIDI.write(b);
+//  UMIDI.write(b);
 }
 
-inline bool uartRxready() {
-  return UMIDI.available();
+inline int uartRxready() {
+//  return UMIDI.available();
 }
 
 inline byte uartRead() {
-  return UMIDI.read();
+//  return UMIDI.read();
 }
 
 inline void initPlatform() {
@@ -43,9 +43,9 @@ inline void initPlatform() {
   while (Serial2.available()) {
     Serial2.read();
   }
-  DISABLE_UART_INT(USART2);
-  DISABLE_UART_INT(USART1);
-  DISABLE_UART_INT(USART0);
+  //DISABLE_UART_INT(USART2);
+  //DISABLE_UART_INT(USART1);
+  //DISABLE_UART_INT(USART0);
   REG_PMC_PCER0 |= (1UL << ID_PIOD); // enable PIO controller.
   controlDirPin.write(LOW);
 }
