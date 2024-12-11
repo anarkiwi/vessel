@@ -5,7 +5,7 @@ fqbn=$2
 
 set -e
 sudo apt-get update && sudo apt-get install wget unzip
-wget -O/tmp/ide.zip https://downloads.arduino.cc/arduino-ide/arduino-ide_2.3.2_Linux_64bit.zip
+wget -O/tmp/ide.zip https://downloads.arduino.cc/arduino-ide/arduino-ide_2.3.4_Linux_64bit.zip
 unzip /tmp/ide.zip
 find arduino-ide* -name python3 -exec ln -sf $(which python3) {} \;
 mkdir ~/bin

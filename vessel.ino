@@ -59,7 +59,7 @@ struct vesselConfigStruct {
   volatile byte outBufWritePtr;
   volatile byte outBufReadPtr;
 };
-struct vesselConfigStruct vesselConfig = {};
+struct vesselConfigStruct vesselConfig;
 byte receiveCommandMask[MAX_MIDI_CHANNEL] = {};
 
 void noopCmd() {}
@@ -446,6 +446,7 @@ inline void outputMode() {
 }
 
 void setup() {
+  memset(&vesselConfig, 0, sizeof(vesselConfig));
   initPins();
   initPlatform();
   resetWritePtrs();
