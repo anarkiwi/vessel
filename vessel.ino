@@ -179,7 +179,6 @@ FakeSerial fs;
 midiEventPacket_t mPacket;
 
 inline bool usbMidiRx() {
-  noInterrupts();
   bool packets = false;
   for (;;) {
   mPacket = MidiUSB.read();
@@ -187,6 +186,7 @@ inline bool usbMidiRx() {
     break;
   }
   packets = true;
+  flagPin.write(HIGH);
   byte cin = GETCIN(mPacket);
   byte len = cin2Len[cin][1];
   switch (len) {
@@ -216,7 +216,7 @@ inline bool usbMidiRx() {
     default:
       break; 
   }}
-  interrupts();
+  flagPin.write(LOW);
   return packets;
 }
 
@@ -353,10 +353,8 @@ inline void drainInBuf() {
 }
 
 inline bool transparentDrainOutBuf() {
-  flagPin.write(HIGH);
   if (usbMidiRx()) {
     blink();
-    flagPin.write(LOW);
     return true;
   }
   return false;
@@ -384,7 +382,7 @@ inline void inputMode() {
   setInputMode();
   isrMode = readByte;
   interrupts();
-  if (vesselConfig.transparent) {
+  if (1) {
     while (inInputMode()) {
       if (!transparentDrainOutBuf()) {
         drainInBuf();
