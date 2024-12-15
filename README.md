@@ -209,7 +209,8 @@ Upgrading firmware (SAMD21 hardware)
 The Arduino IDE can be used to reflash Vessel via the onboard USB-C port.
 You should select the right port in the Tools menu before uploading
 (Vessel will show as an Arduino Zero, native port). You will also need
-the "MIDI Library" (by Francois Best) installed, via Tools/Manage Libraries.
+the "MIDI Library" (by Francois Best) installed, and the "USB-MIDI" library,
+via Tools/Manage Libraries.
 
 
 Upgrading firmware (old SAM3X)
@@ -218,8 +219,8 @@ Upgrading firmware (old SAM3X)
 The Arduino IDE can be used to reflash Vessel via the onboard USB-C port.
 You should select the right port in the Tools menu before uploading
 (Vessel will show as an Arduino Due, native port). You will also need
-the "MIDI Library" (by Francois Best) installed, via Tools/Manage Libraries,
-and support for SAM boards installed (Tools/Board Manager).
+the "MIDI Library" (by Francois Best) installed, and the "USB-MIDI" library,
+via Tools/Manage Libraries, and support for SAM boards installed (Tools/Board Manager).
 
 NOTE: you will need to add the following to to WInterrupts.c:
 

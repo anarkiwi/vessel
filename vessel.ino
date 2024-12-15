@@ -2,45 +2,59 @@
 
 // Copyright 2019 Josh Bailey (josh@vandervecken.com)
 
-// Permission is hereby granted, free of charge, to any person obtaining a copy of this software and associated documentation files (the "Software"), to deal in the Software without restriction, including without limitation the rights to use, copy, modify, merge, publish, distribute, sublicense, and/or sell copies of the Software, and to permit persons to whom the Software is furnished to do so, subject to the following conditions:
+// Permission is hereby granted, free of charge, to any person obtaining a copy
+// of this software and associated documentation files (the "Software"), to deal
+// in the Software without restriction, including without limitation the rights
+// to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+// copies of the Software, and to permit persons to whom the Software is
+// furnished to do so, subject to the following conditions:
 
-// The above copyright notice and this permission notice shall be included in all copies or substantial portions of the Software.
+// The above copyright notice and this permission notice shall be included in
+// all copies or substantial portions of the Software.
 
-// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
+// THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+// IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+// FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+// AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+// LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+// OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+// SOFTWARE.
 
-
+#include "CRDigitalPin.h"
+#include "pins.h"
+#include "platform.h"
 #include <Arduino.h>
 #include <USB-MIDI.h>
 #include <MIDI.h>
-#include "pins.h"
-#include "CRDigitalPin.h"
-#include "platform.h"
 
 const char versionStr[] = {
-  0x16, // V
-  0x05, // E
-  0x13, // S
-  0x13, // S
-  0x05, // E
-  0x0C, // L
-  0x30, // 0
-  0x30, // 0
+    0x16, // V
+    0x05, // E
+    0x13, // S
+    0x13, // S
+    0x05, // E
+    0x0C, // L
+    0x30, // 0
+    0x30, // 0
 };
 
-// The C64 can send us a command by sending a reserved cmd byte, then another byte specifying the command number, then any other bytes the command requires.
-// Each command has a fixed number of bytes expected after the command byte.
+// The C64 can send us a command by sending a reserved cmd byte, then another
+// byte specifying the command number, then any other bytes the command
+// requires. Each command has a fixed number of bytes expected after the command
+// byte.
 const byte vesselCmd = 0xfd;
 
-const byte c64Pins[] = {C64_PB0, C64_PB1, C64_PB2, C64_PB3, C64_PB4, C64_PB5, C64_PB6, C64_PB7};
+const byte c64Pins[] = {C64_PB0, C64_PB1, C64_PB2, C64_PB3,
+                        C64_PB4, C64_PB5, C64_PB6, C64_PB7};
 const uint16_t OUT_BUF_SIZE = 256; // Ring buffer for bytes to send to C64
-const uint16_t IN_BUF_SIZE = 256; // Ring buffer for bytes from C64.
+const uint16_t IN_BUF_SIZE = 256;  // Ring buffer for bytes from C64.
 
 DigitalPin<C64_PA2> pa2Pin(INPUT, LOW);
 DigitalPin<C64_PC2> pc2Pin(INPUT, LOW);
 DigitalPin<C64_FLAG> flagPin(OUTPUT, LOW);
 DigitalPin<DATA_DIR> dataDirPin(OUTPUT, LOW);
 
-#define MAX_MIDI_CHANNEL  16
+#define MAX_MIDI_CHANNEL 16
 
 void readByte();
 
@@ -74,25 +88,12 @@ void configStatusCmd();
 void configCommandCmd();
 
 void (*cmds[])(void) = {
-  resetCmd,
-  purgeCmd,
-  panicCmd,
-  versionCmd,
-  configFlagsCmd,
-  configChannelCmd,
-  configStatusCmd,
-  configCommandCmd,
+    resetCmd,       purgeCmd,         panicCmd,        versionCmd,
+    configFlagsCmd, configChannelCmd, configStatusCmd, configCommandCmd,
 };
 void (*cmd)(void) = NULL;
 const byte cmdLens[] = {
-  0,
-  0,
-  0,
-  0,
-  1,
-  2,
-  2,
-  1,
+    0, 0, 0, 0, 1, 2, 2, 1,
 };
 volatile byte cmdLen = 0;
 const byte maxCmd = sizeof(cmdLens) - 1;
@@ -110,33 +111,25 @@ void inline blink() {
 #endif
 
 class FakeSerial {
-  public:
-    void begin(int BaudRate __attribute__((unused))) {
-    }
-    inline __attribute__((always_inline))
-    void qread(byte i) {
-      c[n++] = i;
-    }
-    inline __attribute__((always_inline))
-    byte read() {
-      return c[--n];
-    }
-    inline __attribute__((always_inline))
-    void write(byte i) {
-      outBuf[vesselConfig.outBufReadPtr++] = i;
-    }
-    inline __attribute__((always_inline))
-    unsigned available() {
-      return n;
-    }
-  private:
-    volatile byte c[16] = {};
-    volatile byte n = 0;
+public:
+  void begin(int BaudRate __attribute__((unused))) {}
+  inline __attribute__((always_inline)) void qread(byte i) { c[n++] = i; }
+  inline __attribute__((always_inline)) byte read() { return c[--n]; }
+  inline __attribute__((always_inline)) void write(byte i) {
+    outBuf[vesselConfig.outBufReadPtr++] = i;
+  }
+  inline __attribute__((always_inline)) unsigned available() { return n; }
+
+private:
+  volatile byte c[IN_BUF_SIZE] = {};
+  volatile byte n = 0;
 };
 
 FakeSerial fs;
 
-#define  MIDI_CHANNEL  MIDI_CHANNEL_OMNI
+#include "vesselusbmidi.h"
+
+#define MIDI_CHANNEL MIDI_CHANNEL_OMNI
 struct VesselSettings : public midi::DefaultSettings {
   // cppcheck-suppress unusedStructMember
   static const bool Use1ByteParsing = true;
@@ -145,14 +138,37 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_WRAP(x) { if (vesselConfig.nmiEnabled) { flagPin.write(HIGH); x; flagPin.write(LOW); } else { x; } }
-#define NMI_CMD_WRAP(x) { if (!vesselConfig.nmiStatusOnlyEnabled) { NMI_WRAP(x); } }
+#define NMI_WRAP(x)                                                            \
+  {                                                                            \
+    if (vesselConfig.nmiEnabled) {                                             \
+      flagPin.write(HIGH);                                                     \
+      x;                                                                       \
+      flagPin.write(LOW);                                                      \
+    } else {                                                                   \
+      x;                                                                       \
+    }                                                                          \
+  }
+#define NMI_CMD_WRAP(x)                                                        \
+  {                                                                            \
+    if (!vesselConfig.nmiStatusOnlyEnabled) {                                  \
+      NMI_WRAP(x);                                                             \
+    }                                                                          \
+  }
 #define NMI_MIDI_STATUS_SEND(x) NMI_WRAP(MIDI.x)
 #define NMI_MIDI_CMD_SEND(x) NMI_CMD_WRAP(MIDI.x)
 
-#define NMI_STATUS_SEND(statusMsg, handler) if (statusMasked(statusMsg)) { NMI_MIDI_STATUS_SEND(handler) }
-#define NMI_CHANNEL_SEND(channel, handler) if (channelMasked(channel)) { NMI_MIDI_CMD_SEND(handler) }
-#define NMI_COMMAND_SEND(command, channel, handler) if (commandMasked(command, channel)) { NMI_CHANNEL_SEND(channel, handler) }
+#define NMI_STATUS_SEND(statusMsg, handler)                                    \
+  if (statusMasked(statusMsg)) {                                               \
+    NMI_MIDI_STATUS_SEND(handler)                                              \
+  }
+#define NMI_CHANNEL_SEND(channel, handler)                                     \
+  if (channelMasked(channel)) {                                                \
+    NMI_MIDI_CMD_SEND(handler)                                                 \
+  }
+#define NMI_COMMAND_SEND(command, channel, handler)                            \
+  if (commandMasked(command, channel)) {                                       \
+    NMI_CHANNEL_SEND(channel, handler)                                         \
+  }
 
 inline void handleNoteOn(byte channel, byte note, byte velocity) {
   NMI_COMMAND_SEND(1, channel, sendNoteOn(note, velocity, channel))
@@ -198,21 +214,15 @@ inline void handleTuneRequest() {
   NMI_STATUS_SEND(midi::TuneRequest, sendTuneRequest())
 }
 
-inline void handleClock(void) {
-  NMI_STATUS_SEND(midi::Clock, sendClock())
-}
+inline void handleClock(void) { NMI_STATUS_SEND(midi::Clock, sendClock()) }
 
-inline void handleStart(void) {
-  NMI_STATUS_SEND(midi::Start, sendStart())
-}
+inline void handleStart(void) { NMI_STATUS_SEND(midi::Start, sendStart()) }
 
 inline void handleContinue(void) {
   NMI_STATUS_SEND(midi::Continue, sendContinue())
 }
 
-inline void handleStop(void) {
-  NMI_STATUS_SEND(midi::Stop, sendStop())
-}
+inline void handleStop(void) { NMI_STATUS_SEND(midi::Stop, sendStop()) }
 
 inline void handleSystemReset(void) {
   NMI_STATUS_SEND(midi::SystemReset, sendSystemReset())
@@ -236,9 +246,9 @@ inline void initPins() {
   for (byte p = 0; p < sizeof(c64Pins); ++p) {
     pinMode(c64Pins[p], INPUT);
   }
-  #ifdef STATUS
+#ifdef STATUS
   statusPin.write(LOW);
-  #endif
+#endif
   flagPin.write(LOW);
 }
 
@@ -252,13 +262,9 @@ inline void setOutputMode() {
   setDataDirOutput();
 }
 
-inline bool inInputMode() {
-  return pa2Pin.read();
-}
+inline bool inInputMode() { return pa2Pin.read(); }
 
-inline bool inBufWaiting() {
-  return inBufReadPtr != inBufWritePtr;
-}
+inline bool inBufWaiting() { return inBufReadPtr != inBufWritePtr; }
 
 inline void drainInBuf() {
   // Avoid buffering, ensure we write direct to UART without waiting.
@@ -274,6 +280,10 @@ inline bool transparentDrainOutBuf() {
     blink();
     return true;
   }
+  if (transparentUsbMidiRx()) {
+    NMI_WRAP(blink());
+    return true;
+  }
   return false;
 }
 
@@ -281,7 +291,12 @@ inline bool drainOutBuf() {
   if (fs.available()) {
     MIDI.read();
     return true;
-  } else if (uartRxready()) {
+  }
+  if (UsbMidiRx()) {
+    blink();
+    return true;
+  }
+  if (uartRxready()) {
     fs.qread(uartRead());
     blink();
     return true;
@@ -313,7 +328,7 @@ inline void inputMode() {
     }
   }
 }
-  
+
 inline void readByte() {
   volatile byte b = getByte();
   if (b == vesselCmd) {
@@ -344,7 +359,8 @@ inline void versionCmd() {
   NMI_WRAP({
     for (byte i = 0; i < sizeof(versionStr); ++i) {
       fs.write(versionStr[i]);
-    }})
+    }
+  })
 }
 
 inline void resetCmd() {
@@ -352,9 +368,7 @@ inline void resetCmd() {
   MIDI.turnThruOff();
 }
 
-inline void purgeCmd() {
-  resetWritePtrs();
-}
+inline void purgeCmd() { resetWritePtrs(); }
 
 inline void panicCmd() {
   // TODO: not yet implemented.
@@ -372,25 +386,17 @@ inline void configFlagsCmd() {
   vesselConfig.nmiStatusOnlyEnabled = configFlags & 8;
 }
 
-inline uint16_t get2bMask() {
-  return (inCmdBuf[0] << 8) + inCmdBuf[1];
-}
+inline uint16_t get2bMask() { return (inCmdBuf[0] << 8) + inCmdBuf[1]; }
 
-inline byte getLoNib() {
-  return inCmdBuf[0] & 0x0f;
-}
+inline byte getLoNib() { return inCmdBuf[0] & 0x0f; }
 
-inline byte getHighNib() {
-  return (inCmdBuf[0] & 0xf0) >> 4;
-}
+inline byte getHighNib() { return (inCmdBuf[0] & 0xf0) >> 4; }
 
 inline void configChannelCmd() {
   vesselConfig.receiveChannelMask = get2bMask();
 }
 
-inline void configStatusCmd() {
-  vesselConfig.receiveStatusMask = get2bMask();
-}
+inline void configStatusCmd() { vesselConfig.receiveStatusMask = get2bMask(); }
 
 inline void configCommandCmd() {
   byte channel = getLoNib();
@@ -424,13 +430,9 @@ inline void outputBytes() {
   }
 }
 
-inline void IoIsr() {
-  (*isrMode)();
-}
+inline void IoIsr() { (*isrMode)(); }
 
-inline void writeByte() {
-  setByte(outBuf[vesselConfig.outBufWritePtr++]);
-}
+inline void writeByte() { setByte(outBuf[vesselConfig.outBufWritePtr++]); }
 
 inline void outputMode() {
   noInterrupts();
@@ -443,7 +445,8 @@ inline void outputMode() {
     isrMode = resetWrite;
   }
   interrupts();
-  while (!inInputMode()) { };
+  while (!inInputMode()) {
+  };
 }
 
 void setup() {
@@ -472,7 +475,8 @@ void setup() {
   resetCmd();
   attachInterrupt(digitalPinToInterrupt(C64_PC2), IoIsr, RISING);
   detachInterrupt(digitalPinToInterrupt(C64_PA2));
-  while (!inInputMode()) { };
+  while (!inInputMode()) {
+  };
 }
 
 void loop() {
