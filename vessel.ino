@@ -10,6 +10,7 @@
 
 
 #include <Arduino.h>
+#include <USB-MIDI.h>
 #include <MIDI.h>
 #include "pins.h"
 #include "CRDigitalPin.h"
