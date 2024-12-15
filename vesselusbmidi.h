@@ -24,7 +24,6 @@ inline bool usbMidiRx() {
       break;
     }
     packets = true;
-    flagPin.write(HIGH);
     byte cin = GETCIN(mPacket);
     byte len = usbMidi::cin2Len[cin][1];
     switch (len) {
@@ -39,6 +38,8 @@ inline bool usbMidiRx() {
         break;
       case 0x6:
         URXBUFFER_PUSHBACK2
+        break;
+      default:
         break;
       }
       break;
@@ -55,6 +56,5 @@ inline bool usbMidiRx() {
       break;
     }
   }
-  flagPin.write(LOW);
   return packets;
 }

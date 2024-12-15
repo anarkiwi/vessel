@@ -270,7 +270,7 @@ inline void drainInBuf() {
 
 inline bool transparentDrainOutBuf() {
   if (usbMidiRx()) {
-    blink();
+    NMI_WRAP(blink());
     return true;
   }
   return false;
