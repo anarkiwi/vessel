@@ -6,36 +6,20 @@ DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 // TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
 // bypass all interrupt usage and do polling with our own ringbuffer.
-// inline bool uartTxready() {
-//   return USART1->US_CSR & US_CSR_TXRDY;
-// }
-
-// inline void uartWrite(byte b) {
-//   USART1->US_THR = b;
-// }
-
-// inline bool uartRxready() {
-//   return USART1->US_CSR & US_CSR_RXRDY;
-// }
-
-// inline byte uartRead() {
-//   return USART1->US_RHR;
-// }
-
 inline bool uartTxready() {
-  return true;
+  return USART1->US_CSR & US_CSR_TXRDY;
 }
 
 inline void uartWrite(byte b) {
-//  UMIDI.write(b);
+  USART1->US_THR = b;
 }
 
-inline int uartRxready() {
-//  return UMIDI.available();
+inline bool uartRxready() {
+  return USART1->US_CSR & US_CSR_RXRDY;
 }
 
 inline byte uartRead() {
-//  return UMIDI.read();
+  return USART1->US_RHR;
 }
 
 inline void initPlatform() {
@@ -43,9 +27,9 @@ inline void initPlatform() {
   while (Serial2.available()) {
     Serial2.read();
   }
-  //DISABLE_UART_INT(USART2);
-  //DISABLE_UART_INT(USART1);
-  //DISABLE_UART_INT(USART0);
+  DISABLE_UART_INT(USART2);
+  DISABLE_UART_INT(USART1);
+  DISABLE_UART_INT(USART0);
   REG_PMC_PCER0 |= (1UL << ID_PIOD); // enable PIO controller.
   controlDirPin.write(LOW);
 }

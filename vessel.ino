@@ -128,7 +128,7 @@ class FakeSerial {
       return n;
     }
   private:
-    volatile byte c[128] = {};
+    volatile byte c[IN_BUF_SIZE] = {};
     volatile byte n = 0;
 };
 
@@ -262,14 +262,19 @@ inline bool inBufWaiting() {
 
 inline void drainInBuf() {
   // Avoid buffering, ensure we write direct to UART without waiting.
-  //if (inBufWaiting() && uartTxready()) {
-  //  uartWrite(inBuf[++inBufWritePtr]);
-  //  blink();
-  //}
+  if (inBufWaiting() && uartTxready()) {
+    uartWrite(inBuf[++inBufWritePtr]);
+    blink();
+  }
 }
 
 inline bool transparentDrainOutBuf() {
-  if (usbMidiRx()) {
+  if (uartRxready()) {
+    NMI_WRAP(fs.write(uartRead()));
+    blink();
+    return true;
+  }
+  if (transparentUsbMidiRx()) {
     NMI_WRAP(blink());
     return true;
   }
@@ -281,7 +286,12 @@ inline bool drainOutBuf() {
     MIDI.read();
     return true;
   }
-  if (usbMidiRx()) {
+  if (UsbMidiRx()) {
+    blink();
+    return true;
+  }
+  if (uartRxready()) {
+    fs.qread(uartRead());
     blink();
     return true;
   }
