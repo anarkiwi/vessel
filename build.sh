@@ -16,6 +16,7 @@ PATH=~/bin:$PATH arduino-cli config init
 PATH=~/bin:$PATH arduino-cli core update-index
 PATH=~/bin:$PATH arduino-cli core install $platform
 PATH=~/bin:$PATH arduino-cli lib install "MIDI Library"
+PATH=~/bin:$PATH arduino-cli lib install "USB-MIDI"
 
 if [[ "$platform" == "arduino:sam" ]] ; then
   WINT=$(find ~/.arduino15/packages/arduino/hardware/sam -name WInterrupts.c)
