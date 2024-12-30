@@ -231,14 +231,6 @@ On Linux, WInterrupts.c can be located with:
     $ find .arduino15/ -name WInterrupts.c | grep sam
     .arduino15/packages/arduino/hardware/sam/1.6.12/cores/arduino/WInterrupts.c
 
-You will also need to change Arduino's default optimization settings. Change
-all references to -Os, to -O2, in platforms.txt.
-
-On Linux, platforms.txt can be located with:
-
-    $ find .arduino15/ -name platform.txt | grep sam
-    .arduino15/packages/arduino/hardware/sam/1.6.12/platform.txt
-
 If you will upgrade the IDE you will have to make these changes again. 
 
 
