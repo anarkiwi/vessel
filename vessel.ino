@@ -20,6 +20,8 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
+#pragma GCC optimize ("O3")
+
 #include "CRDigitalPin.h"
 #include "pins.h"
 #include "platform.h"
