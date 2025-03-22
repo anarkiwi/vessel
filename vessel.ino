@@ -446,6 +446,11 @@ inline void outputMode() {
   interrupts();
   while (!inInputMode()) {
   };
+  // handle incomplete read.
+  if (vesselConfig.pendingOut) {
+    --vesselConfig.outBufWritePtr;
+    ++vesselConfig.pendingOut;
+  }
 }
 
 void setup() {
