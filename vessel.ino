@@ -20,14 +20,14 @@
 // OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 // SOFTWARE.
 
-#pragma GCC optimize ("O3")
+#pragma GCC optimize("O3")
 
 #include "CRDigitalPin.h"
 #include "pins.h"
 #include "platform.h"
 #include <Arduino.h>
-#include <USB-MIDI.h>
 #include <MIDI.h>
+#include <USB-MIDI.h>
 
 const char versionStr[] = {
     0x16, // V
@@ -75,6 +75,7 @@ struct vesselConfigStruct {
   bool transparent;
   volatile byte outBufWritePtr;
   volatile byte outBufReadPtr;
+  volatile byte pendingOut;
 };
 struct vesselConfigStruct vesselConfig;
 byte receiveCommandMask[MAX_MIDI_CHANNEL] = {};
@@ -119,6 +120,7 @@ public:
   inline __attribute__((always_inline)) byte read() { return c[--n]; }
   inline __attribute__((always_inline)) void write(byte i) {
     outBuf[vesselConfig.outBufReadPtr++] = i;
+    ++vesselConfig.pendingOut;
   }
   inline __attribute__((always_inline)) unsigned available() { return n; }
 
@@ -309,6 +311,7 @@ inline bool drainOutBuf() {
 inline void resetWritePtrs() {
   vesselConfig.outBufWritePtr = 0;
   vesselConfig.outBufReadPtr = 0;
+  vesselConfig.pendingOut = 0;
 }
 
 inline void inputMode() {
@@ -420,14 +423,13 @@ inline void readCmdData() {
 
 inline void resetWrite() {
   isrMode = noopCmd;
-  resetWritePtrs();
   drainInBuf();
 }
 
 inline void outputBytes() {
   writeByte();
   // Last byte, and at least one byte written, reset for next cycle.
-  if (--vesselConfig.outBufReadPtr == 0) {
+  if (--vesselConfig.pendingOut == 0) {
     isrMode = resetWrite;
   }
 }
@@ -439,8 +441,8 @@ inline void writeByte() { setByte(outBuf[vesselConfig.outBufWritePtr++]); }
 inline void outputMode() {
   noInterrupts();
   setOutputMode();
-  setByte(vesselConfig.outBufReadPtr);
-  if (vesselConfig.outBufReadPtr) {
+  setByte(vesselConfig.pendingOut);
+  if (vesselConfig.pendingOut) {
     isrMode = outputBytes;
     blink();
   } else {
