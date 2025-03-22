@@ -421,16 +421,11 @@ inline void readCmdData() {
   }
 }
 
-inline void resetWrite() {
-  isrMode = noopCmd;
-  drainInBuf();
-}
-
 inline void outputBytes() {
   writeByte();
   // Last byte, and at least one byte written, reset for next cycle.
   if (--vesselConfig.pendingOut == 0) {
-    isrMode = resetWrite;
+    isrMode = noopCmd;
   }
 }
 
@@ -446,7 +441,7 @@ inline void outputMode() {
     isrMode = outputBytes;
     blink();
   } else {
-    isrMode = resetWrite;
+    isrMode = noopCmd;
   }
   interrupts();
   while (!inInputMode()) {
