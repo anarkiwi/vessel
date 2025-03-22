@@ -421,11 +421,13 @@ inline void readCmdData() {
   }
 }
 
+// ensure very last pending byte was read.
+void ackLast() { isrMode = &noopCmd; }
+
 inline void outputBytes() {
   writeByte();
-  // Last byte, and at least one byte written, reset for next cycle.
   if (--vesselConfig.pendingOut == 0) {
-    isrMode = noopCmd;
+    isrMode = &ackLast;
   }
 }
 
@@ -446,8 +448,7 @@ inline void outputMode() {
   interrupts();
   while (!inInputMode()) {
   };
-  // handle incomplete read.
-  if (vesselConfig.pendingOut) {
+  if (isrMode != &noopCmd) {
     --vesselConfig.outBufWritePtr;
     ++vesselConfig.pendingOut;
   }
