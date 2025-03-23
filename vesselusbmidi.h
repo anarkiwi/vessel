@@ -62,7 +62,7 @@ midiEventPacket_t mPacket;
     return packets;                                                            \
   }
 
-USBMIDIRX(transparentUsbMidiRx, PUSHBACK1(fs.write), PUSHBACK2(fs.write),
-          PUSHBACK3(fs.write));
+USBMIDIRX(transparentUsbMidiRx, PUSHBACK1(fs.ctrl_write), PUSHBACK2(fs.ctrl_write),
+          PUSHBACK3(fs.ctrl_write));
 USBMIDIRX(UsbMidiRx, PUSHBACK1(fs.qread), PUSHBACK2(fs.qread),
           PUSHBACK3(fs.qread));
