@@ -112,7 +112,16 @@ void inline blink() {
 #else
 #define blink()
 #endif
-
+#define NMI_WRAP(x)                                                            \
+  {                                                                            \
+    if (vesselConfig.nmiEnabled) {                                             \
+      flagPin.write(HIGH);                                                     \
+      x;                                                                       \
+      flagPin.write(LOW);                                                      \
+    } else {                                                                   \
+      x;                                                                       \
+    }                                                                          \
+  }
 class FakeSerial {
 public:
   void begin(int BaudRate __attribute__((unused))) {}
@@ -121,6 +130,13 @@ public:
   inline __attribute__((always_inline)) void write(byte i) {
     outBuf[vesselConfig.outBufReadPtr++] = i;
     ++vesselConfig.pendingOut;
+  }
+  inline __attribute__((always_inline)) void ctrl_write(byte i) {
+    write(i);
+    // send NMI on control message or sysex stop.
+    if ((i | 0x80) && (i != midi::MidiType::SystemExclusiveStart)) {
+      NMI_WRAP(blink());
+    }
   }
   inline __attribute__((always_inline)) unsigned available() { return n; }
 
@@ -142,16 +158,6 @@ struct VesselSettings : public midi::DefaultSettings {
 
 MIDI_CREATE_CUSTOM_INSTANCE(FakeSerial, fs, MIDI, VesselSettings);
 
-#define NMI_WRAP(x)                                                            \
-  {                                                                            \
-    if (vesselConfig.nmiEnabled) {                                             \
-      flagPin.write(HIGH);                                                     \
-      x;                                                                       \
-      flagPin.write(LOW);                                                      \
-    } else {                                                                   \
-      x;                                                                       \
-    }                                                                          \
-  }
 #define NMI_CMD_WRAP(x)                                                        \
   {                                                                            \
     if (!vesselConfig.nmiStatusOnlyEnabled) {                                  \
@@ -285,7 +291,6 @@ inline bool transparentDrainOutBuf() {
     return true;
   }
   if (transparentUsbMidiRx()) {
-    NMI_WRAP(blink());
     return true;
   }
   return false;
