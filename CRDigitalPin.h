@@ -38,7 +38,10 @@ public:
   inline void high() { write(true); }
   inline void low() { write(false); }
   inline bool read() const { return hostsim::pinLevel[PinNumber]; }
-  inline void write(bool value) { hostsim::pinLevel[PinNumber] = value; }
+  inline void write(bool value) {
+    hostsim::pinLevel[PinNumber] = value;
+    ++hostsim::pinWrites[PinNumber];
+  }
 };
 #else
 

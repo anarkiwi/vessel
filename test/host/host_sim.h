@@ -25,6 +25,9 @@ extern std::deque<uint8_t> uartIn;
 extern std::vector<uint8_t> uartTx;
 // Simulated digital pin levels, indexed by Arduino pin number.
 extern bool pinLevel[256];
+// Count of writes to each pin, so tests can detect NMI pulses (a HIGH/LOW pair
+// on the FLAG pin) rather than just final level.
+extern unsigned long pinWrites[256];
 
 // Clear all simulated I/O state. Call between tests.
 void reset();

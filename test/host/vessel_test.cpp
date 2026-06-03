@@ -116,6 +116,13 @@ TEST_F(VesselTest, ResetCommandClearsConfig) {
   EXPECT_FALSE(vesselConfig.nmiEnabled);
 }
 
+TEST_F(VesselTest, ResetCommandClearsPerChannelCommandMask) {
+  feedC64({vesselCmd, 0x07, 0x19}); // command mask for channel nibble 9
+  ASSERT_EQ(receiveCommandMask[9], 0x01);
+  feedC64({vesselCmd, 0x00}); // reset must clear the separate mask array too
+  EXPECT_EQ(receiveCommandMask[9], 0x00);
+}
+
 TEST_F(VesselTest, UnknownCommandIsIgnoredAndParserRecovers) {
   feedC64({vesselCmd, 0x42}); // 0x42 > maxCmd
   EXPECT_EQ(isrMode, readByte);
@@ -190,6 +197,34 @@ TEST_F(VesselTest, TransparentUsbMidiDecodesSingleByteSysExEnd) {
 
 TEST_F(VesselTest, UsbMidiReturnsFalseWhenNoPackets) {
   EXPECT_FALSE(transparentUsbMidiRx());
+}
+
+// Regression: non-transparent USB-MIDI queues a whole message into FakeSerial
+// before MIDI.read() drains it, so FakeSerial must preserve byte order (FIFO).
+// A LIFO reversed the bytes and the message was lost.
+TEST_F(VesselTest, UsbMidiForwardsMultiByteMessageInOrder) {
+  feedC64({vesselCmd, 0x05, 0x02, 0x00}); // enable channel 10
+  feedC64({vesselCmd, 0x07, 0x19});       // enable note-on on channel 10
+  MidiUSB.rx.push_back(
+      midiEventPacket_t{0x09, 0x99, 0x3c, 0x40}); // NoteOn ch10
+  for (int i = 0; i < 10; ++i) {
+    drainOutBuf();
+  }
+  ASSERT_EQ(vesselConfig.pendingOut, 3);
+  EXPECT_EQ(outBuf[0], 0x99);
+  EXPECT_EQ(outBuf[1], 0x3c);
+  EXPECT_EQ(outBuf[2], 0x40);
+}
+
+// Regression: ctrl_write must raise an NMI only on status bytes (bit 7 set),
+// not on every byte. The bug tested bit 7 with OR (always true) instead of AND.
+TEST_F(VesselTest, CtrlWriteRaisesNmiOnStatusByteOnly) {
+  vesselConfig.nmiEnabled = true;
+  unsigned long before = hostsim::pinWrites[C64_FLAG];
+  fs.ctrl_write(0x40); // data byte: no NMI pulse
+  EXPECT_EQ(hostsim::pinWrites[C64_FLAG], before);
+  fs.ctrl_write(0x90); // status byte: NMI pulse (FLAG toggled high then low)
+  EXPECT_GT(hostsim::pinWrites[C64_FLAG], before);
 }
 
 } // namespace
