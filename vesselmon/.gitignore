@@ -1,0 +1,4 @@
+# host test binary
+test/vesselmon_test
+# llvm-mos intermediate ELF
+*.elf
