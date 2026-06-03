@@ -23,11 +23,14 @@ Supported applications
 Vessel is only compatible with software written specially for it
 as it has its own protocol. Currently known applications are:
 
-* [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases), and [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard-vessel) - supports variable external clock
-* [Station64](http://www.djindikator.net/c64/)
-* [Vessel ASID Player](https://github.com/anarkiwi/vap/releases)
-* [Vicficken](https://github.com/anarkiwi/vvf/releases)
-* [Vessel MIDI Player](https://github.com/anarkiwi/vmp/releases)
+| Application | What it is | Vessel functionality used |
+| --- | --- | --- |
+| [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases) / [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard-vessel) | Native C64 music tracker with live-performance MIDI sync | Receives external MIDI clock; uses Vessel's NMI-on-MIDI-clock to run playback precisely synchronized to external gear |
+| [Station64 V2.6](https://csdb.dk/release/?id=207214) | C64 MIDI sequencer/performance station | MIDI input and output |
+| [Vessel ASID Player](https://github.com/anarkiwi/vap/releases) | Turns the C64's SID(s) into a remote ASID synthesis device | Receives MIDI SysEx (ASID protocol) to write SID registers; supports dual SID |
+| [Vicficken](https://github.com/anarkiwi/vvf/releases) | MIDI-controlled port of the Vicficken synth | Receives MIDI to drive all synth parameters (replacing joystick/paddle/keyboard) |
+| [Vessel MIDI Player](https://github.com/anarkiwi/vmp/releases) | Turns the C64's SID(s) into a multi-voice MIDI synth | Receives notes, pitchbend and CC across channels; relies on Vessel's large buffers, CIA parallel transfer and MIDI message filtering |
+| [Vesselmon](https://github.com/anarkiwi/vessel) | Reference test/monitor program in the Vessel repository | Configures Vessel and exercises raw MIDI send/receive (including loopback) and device detection |
 
 Theory of operation
 -------------------
