@@ -276,6 +276,19 @@ so the MIDI parser is exercised end to end.
 
 The tests, mocks, and build live under `test/host/`.
 
+### Application integration tests
+
+`vessel_test.cpp` also contains `Station64*` tests that replay the exact
+user-port command sequences the [Station64](http://www.djindikator.net/c64/)
+application sends to Vessel — its version probe, both init variants
+(transparent and NMI), and a MIDI receive round-trip — and assert the firmware
+still honours that contract. The protocol was recovered by disassembling the
+(crunched) application in an emulator; see `test/station64/PROTOCOL.md` for the
+disassembly and method. These run in the same suite with no extra dependencies,
+so a firmware change that would break Station64 fails CI. (A heavier optional
+lane could co-simulate the real application live in `asid-vice` against this
+host build; the captured byte sequences keep the fast path dependency-free.)
+
 Run them in Docker (matches CI exactly):
 
 ```
