@@ -1,115 +1,30 @@
 # Vessel API
 
-Following is example C64 assembly language for communicating with Vessel.
-By default, Vessel will not generate any interrupts, and will not pass through
-any received MIDI data to the C64, though it always passes through MIDI data
-from the C64 no matter what.
+The C64 talks to Vessel over the user port (CIA2, port B). The C64 always
+controls the direction:
 
-## Configuration
+| Register | Meaning |
+|----------|---------|
+| `$dd00` bit 2 | data direction: `1` = C64 → Vessel (**output**, send MIDI/commands), `0` = Vessel → C64 (**input**, receive MIDI) |
+| `$dd01` | the 8 data bits (PB0-7) |
+| `$dd03` | port B data direction register (`$ff` = output, `$00` = input) |
 
-Vessel needs to be configured (see [C64 to Vessel commands](#c64-to-vessel-commands))
-to pass received MIDI data to the C64. Also, NMIs need to be explicitly enabled
-if they are desired. Configuration is done by sending commands in output mode.
+To **send** MIDI: set output mode, then store each byte to `$dd01`.
 
-Following is an typical example to enable reception of all real time messages,
-and note on and note off messages on channel 10, and enable NMIs.
+To **receive** MIDI: set input mode, read the byte count from `$dd01`, then read
+that many bytes. Vessel masks all MIDI by default, so a program must first
+configure it (see the commands below) or enable transparent mode — otherwise no
+MIDI is forwarded to the C64. The maximum number of bytes returned in one read
+is 255.
 
-```
-        ;Set PA2 to 1 to signal OUTPUT
-        lda $dd00
-        ora #%00000100  ;Set bit2 to 1
-        sta $dd00
-
-        ;Set Port B to output
-        lda #$ff
-        sta $dd03
-
-        ;Send command 0x4, enable NMI.
-        lda #$fd
-        sta $dd01
-        lda #$04
-        sta $dd01
-        lda #$01
-        sta $dd01
-
-        ;Send command 0x6, enable all real time messages.
-        lda #$fd
-        sta $dd01
-        lda #$06
-        sta $dd01
-        lda #$ff
-        sta $dd01
-        lda #$ff
-        sta $dd01
-
-        ;Send command 0x5, enable channel 10
-        lda #$fd
-        sta $dd01
-        lda #$05
-        sta $dd01
-        lda #$02
-        sta $dd01
-        lda #$00
-        sta $dd01
-
-        ;Send command 0x7, enable note on and note off on channel 10
-        lda #$fd
-        sta $dd01
-        lda #$07
-        sta $dd01
-        lda #$79 ;0111 - all messages - 1001 channel 10
-        sta $dd01
-```
-
-## Outputting MIDI and commands
-
-```
-        ;Set PA2 to 1 to signal OUTPUT
-        lda $dd00
-        ora #%00000100  ;Set bit2 to 1
-        sta $dd00
-
-        ;Set Port B to output
-        lda #$ff
-        sta $dd03
-
-        ;Bytes are sent by storing values to Port B
-        lda #XX
-        sta $dd01
-```
-
-## Inputting MIDI
-
-```
-        ;Reset PA2 to signal INPUT mode
-        lda $dd00
-        and #%11111011  ;Set bit2 to 0
-        sta $dd00
-
-        ;Set Port B to input
-        lda #$00
-        sta $dd03
-
-        ;Read the available number of bytes. Max number of bytes in one go is 255 (not 256)
-        ldy $dd01       ;Read bytecount from Port B
-        beq .nobytesleft
-.getmidiindata:
-        lda $dd01 ;Read MIDI byte from Port B
-        sta $XXXX ;Wherever desired
-        dey
-        bne .getmidiindata
-.nobytesleft:
-```
+By default: transparent mode is off, NMI on external input is off, all MIDI
+channels are masked, all status messages are masked (no MIDI is sent to the
+C64), and MIDI through is disabled.
 
 ## C64 to Vessel commands
 
-The C64 can send Vessel a command, by sending byte 0xFD (not used by MIDI),
-and then a command, and then a fixed number of data bytes (depending on the
-command - unless otherwise specified, a command is followed by 0 data bytes).
-
-By default, transparent mode is off, NMI on external input is off, all MIDI channels
-are masked and all status messages will be masked (no MIDI messages will be sent
-to the C64) and MIDI through is disabled.
+The C64 sends Vessel a command by writing byte `$fd` (never a real MIDI byte),
+then the command number, then a fixed number of data bytes (0 unless noted).
 
 |byte|command     |arg bytes|description
 |----|------------|---------|--------------------------------------------------------------------------
@@ -121,3 +36,19 @@ to the C64) and MIDI through is disabled.
 |0x05|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16.
 |0x06|Status mask |HH LL    |High byte (HH), low byte (LL) for channel-less messages F0 to FF.
 |0x07|Control mask|CM       |MSB unused, 3 high bits command mask, 4 low bits channel.
+
+## Working examples
+
+Complete, runnable C64 programs that assemble with ACME live in
+[`../examples/`](../examples) (and are assembled in CI):
+
+| Example | Shows |
+|---------|-------|
+| [`send.asm`](../examples/send.asm) | outputting MIDI |
+| [`receive.asm`](../examples/receive.asm) | configuration + inputting MIDI |
+| [`echo.asm`](../examples/echo.asm) | transparent-mode passthrough/loopback |
+| [`vessel.inc`](../examples/vessel.inc) | the shared output/input/read routines |
+
+For NMI-on-MIDI-clock sync and how real applications drive Vessel, see
+[`../test/sidwizard/PROTOCOL.md`](../test/sidwizard/PROTOCOL.md) and
+[`../test/station64/PROTOCOL.md`](../test/station64/PROTOCOL.md).

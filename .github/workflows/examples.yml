@@ -1,0 +1,11 @@
+name: examples
+on: [push, pull_request]
+jobs:
+  assemble:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+      - name: Install ACME
+        run: sudo apt-get update && sudo apt-get install -y acme
+      - name: Assemble examples
+        run: make -C examples
