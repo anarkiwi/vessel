@@ -355,4 +355,40 @@ TEST_F(VesselTest, SidWizardNmiOffClearsFlags) {
   EXPECT_FALSE(vesselConfig.nmiStatusOnlyEnabled);
 }
 
+// ---------------------------------------------------------------------------
+// examples/ compatibility: the example programs in examples/ configure Vessel
+// with these exact sequences; verify the firmware behaves as they expect.
+// ---------------------------------------------------------------------------
+
+TEST_F(VesselTest, EchoExampleTransparentModePassesRawMidi) {
+  // examples/echo.asm enables transparent mode (FD 04 04); raw MIDI then passes
+  // straight through to the C64 to be echoed back.
+  feedC64({vesselCmd, 0x04, 0x04});
+  ASSERT_TRUE(vesselConfig.transparent);
+  hostsim::uartIn.push_back(0x90);
+  hostsim::uartIn.push_back(0x3c);
+  hostsim::uartIn.push_back(0x40);
+  while (transparentDrainOutBuf()) {
+  }
+  ASSERT_EQ(vesselConfig.pendingOut, 3);
+  EXPECT_EQ(outBuf[0], 0x90);
+  EXPECT_EQ(outBuf[1], 0x3c);
+  EXPECT_EQ(outBuf[2], 0x40);
+}
+
+TEST_F(VesselTest, ReceiveExampleConfigForwardsNoteOn) {
+  // examples/receive.asm: Reset + all channels + all commands + all status.
+  feedC64({vesselCmd, 0x00});
+  feedC64({vesselCmd, 0x05, 0xff, 0xff});
+  for (int ch = 0x70; ch < 0x80; ++ch) {
+    feedC64({vesselCmd, 0x07, (uint8_t)ch});
+  }
+  feedC64({vesselCmd, 0x06, 0xff, 0xff});
+  pumpMidiIn({0x90, 0x3c, 0x40}); // NoteOn ch1
+  ASSERT_EQ(vesselConfig.pendingOut, 3);
+  EXPECT_EQ(outBuf[0], 0x90);
+  EXPECT_EQ(outBuf[1], 0x3c);
+  EXPECT_EQ(outBuf[2], 0x40);
+}
+
 } // namespace

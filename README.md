@@ -76,6 +76,8 @@ Vessel API
 
 The C64-side protocol — configuration, sending and receiving MIDI, and the full
 set of C64-to-Vessel commands — is documented in [docs/API.md](docs/API.md).
+Complete, runnable example programs (assembled in CI) are in
+[examples/](examples).
 
 Upgrading firmware (SAMD21 hardware)
 ------------------------------------
