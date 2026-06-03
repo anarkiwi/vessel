@@ -62,7 +62,7 @@ With the open + `FD 04 09` config:
   entirely, so only realtime status reaches the C64 — exactly what a clock-sync
   client wants, and it keeps the NMI rate low.
 
-> Note: the README describes bit 3 as "enables NMI for status messages only",
+> Note: `docs/API.md` describes bit 3 as "enables NMI for status messages only",
 > but the implementation also *suppresses forwarding* of channel messages while
 > it is set. SID Wizard depends on this (it only consumes clock/start/stop), so
 > the test pins the current behaviour.
