@@ -278,16 +278,24 @@ The tests, mocks, and build live under `test/host/`.
 
 ### Application integration tests
 
-`vessel_test.cpp` also contains `Station64*` tests that replay the exact
-user-port command sequences the [Station64](http://www.djindikator.net/c64/)
-application sends to Vessel — its version probe, both init variants
-(transparent and NMI), and a MIDI receive round-trip — and assert the firmware
-still honours that contract. The protocol was recovered by disassembling the
-(crunched) application in an emulator; see `test/station64/PROTOCOL.md` for the
-disassembly and method. These run in the same suite with no extra dependencies,
-so a firmware change that would break Station64 fails CI. (A heavier optional
-lane could co-simulate the real application live in `asid-vice` against this
-host build; the captured byte sequences keep the fast path dependency-free.)
+`vessel_test.cpp` also replays the exact user-port command sequences real
+Vessel applications send, and asserts the firmware still honours each one. Two
+applications, driving Vessel in deliberately different ways, are covered:
+
+* **`Station64*`** — version probe, both init variants (transparent and NMI),
+  channel/command masks, and a MIDI receive round-trip. Protocol recovered by
+  disassembling the (crunched) application in an emulator; see
+  `test/station64/PROTOCOL.md`.
+* **`SidWizard*`** — [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard-vessel),
+  which uses Vessel's NMI-on-MIDI-clock sync (status mask + config flag `$09`,
+  NMI-status-only). Covers that a MIDI clock is forwarded *and* pulses /FLAG
+  while channel messages are suppressed. Protocol read from its open ACME
+  source; see `test/sidwizard/PROTOCOL.md`.
+
+These run in the same suite with no extra dependencies, so a firmware change
+that breaks either application fails CI. (A heavier optional lane could
+co-simulate an application live in `asid-vice` against this host build; the
+captured byte sequences keep the fast path dependency-free.)
 
 Run them in Docker (matches CI exactly):
 

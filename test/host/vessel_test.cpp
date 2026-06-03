@@ -287,4 +287,72 @@ TEST_F(VesselTest, Station64ReceivesNoteOnAfterInit) {
   EXPECT_EQ(outBuf[2], 0x40);
 }
 
+// ---------------------------------------------------------------------------
+// M64 SID Wizard application integration: replay the sequences from its ACME
+// source (see test/sidwizard/PROTOCOL.md). SID Wizard drives Vessel very
+// differently from Station64: it sets the status mask and uses
+// NMI-on-MIDI-clock (config flag $09 = NMI + NMI-status-only) to sync playback,
+// exercising the receiveStatusMask and nmiStatusOnlyEnabled firmware paths.
+// ---------------------------------------------------------------------------
+
+// SID Wizard's MIDIC64.Open (OpenLgc): full reset + all channels + all commands
+// + all status (realtime) messages.
+static void sidWizardDeviceOpen() {
+  feedC64({vesselCmd, 0x00});             // Reset
+  feedC64({vesselCmd, 0x05, 0xff, 0xff}); // all 16 channels
+  for (int ch = 0x70; ch < 0x80; ++ch) {  // all commands, every channel
+    feedC64({vesselCmd, 0x07, (uint8_t)ch});
+  }
+  feedC64({vesselCmd, 0x06, 0xff, 0xff}); // status mask = all realtime
+}
+
+TEST_F(VesselTest, SidWizardDeviceOpenConfiguresMasks) {
+  sidWizardDeviceOpen();
+  EXPECT_EQ(vesselConfig.receiveChannelMask, 0xffff);
+  EXPECT_EQ(vesselConfig.receiveStatusMask, 0xffff); // the differentiator
+  for (int c = 0; c < 16; ++c) {
+    EXPECT_EQ(receiveCommandMask[c], 0x07) << "channel " << c;
+  }
+}
+
+TEST_F(VesselTest, SidWizardNmiSyncEnableSetsStatusOnlyNmi) {
+  sidWizardDeviceOpen();
+  feedC64({vesselCmd, 0x04, 0x09}); // vessel_NMI_ON: NMI + NMI-status-only
+  EXPECT_TRUE(vesselConfig.nmiEnabled);
+  EXPECT_TRUE(vesselConfig.nmiStatusOnlyEnabled);
+  EXPECT_FALSE(vesselConfig.transparent);
+}
+
+TEST_F(VesselTest, SidWizardClockForwardedAndRaisesNmi) {
+  // The MIDI clock tick must reach the C64 AND pulse /FLAG so SID Wizard's NMI
+  // handler runs and advances playback.
+  sidWizardDeviceOpen();
+  feedC64({vesselCmd, 0x04, 0x09});
+  unsigned long flagsBefore = hostsim::pinWrites[C64_FLAG];
+  pumpMidiIn({0xf8}); // MIDI Timing Clock
+  ASSERT_GE(vesselConfig.pendingOut, 1);
+  EXPECT_EQ(outBuf[0], 0xf8);
+  EXPECT_GT(hostsim::pinWrites[C64_FLAG], flagsBefore); // /FLAG pulsed => NMI
+}
+
+TEST_F(VesselTest, SidWizardNoteOnSuppressedInStatusOnlyMode) {
+  // In NMI-status-only mode, channel messages are dropped entirely (not
+  // forwarded, no NMI) so only sync messages reach the C64. SID Wizard relies
+  // on this to keep the NMI rate low.
+  sidWizardDeviceOpen();
+  feedC64({vesselCmd, 0x04, 0x09});
+  unsigned long flagsBefore = hostsim::pinWrites[C64_FLAG];
+  pumpMidiIn({0x90, 0x3c, 0x40}); // NoteOn ch1
+  EXPECT_EQ(vesselConfig.pendingOut, 0);
+  EXPECT_EQ(hostsim::pinWrites[C64_FLAG], flagsBefore); // no NMI
+}
+
+TEST_F(VesselTest, SidWizardNmiOffClearsFlags) {
+  sidWizardDeviceOpen();
+  feedC64({vesselCmd, 0x04, 0x09});
+  feedC64({vesselCmd, 0x04, 0x00}); // vessel_NMI_OFF
+  EXPECT_FALSE(vesselConfig.nmiEnabled);
+  EXPECT_FALSE(vesselConfig.nmiStatusOnlyEnabled);
+}
+
 } // namespace
