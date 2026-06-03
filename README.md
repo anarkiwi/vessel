@@ -74,134 +74,8 @@ while PA2 changes state input/output).
 Vessel API
 ----------
 
-Following is example C64 assembly language for communicating with Vessel.
-By default, Vessel will not generate any interrupts, and will not pass through
-any received MIDI data to the C64, though it always passes through MIDI data
-from the C64 no matter what.
-
-
-Configuration
--------------
-
-Vessel needs to be configured (see C64 to Vessel commands) to pass received
-MIDI data to the C64. Also, NMIs need to be explicitly enabled if they are desired.
-Configuration is done by sending commands in output mode.
-
-Following is an typical example to enable reception of all real time messages,
-and note on and note off messages on channel 10, and enable NMIs.
-
-```
-        ;Set PA2 to 1 to signal OUTPUT
-        lda $dd00
-        ora #%00000100  ;Set bit2 to 1
-        sta $dd00
-
-        ;Set Port B to output
-        lda #$ff
-        sta $dd03
-
-        ;Send command 0x4, enable NMI.
-        lda #$fd
-        sta $dd01
-        lda #$04
-        sta $dd01
-        lda #$01
-        sta $dd01
-
-        ;Send command 0x6, enable all real time messages.
-        lda #$fd
-        sta $dd01
-        lda #$06
-        sta $dd01
-        lda #$ff
-        sta $dd01
-        lda #$ff
-        sta $dd01
-
-        ;Send command 0x5, enable channel 10
-        lda #$fd
-        sta $dd01
-        lda #$05
-        sta $dd01
-        lda #$02
-        sta $dd01
-        lda #$00
-        sta $dd01
-
-        ;Send command 0x7, enable note on and note off on channel 10
-        lda #$fd
-        sta $dd01
-        lda #$07
-        sta $dd01
-        lda #$79 ;0111 - all messages - 1001 channel 10
-        sta $dd01
-```
-
-
-Outputting MIDI and commands
-----------------------------
-
-```
-        ;Set PA2 to 1 to signal OUTPUT
-	lda $dd00
-	ora #%00000100	;Set bit2 to 1
-	sta $dd00
-
-	;Set Port B to output
-	lda #$ff
-	sta $dd03
-
-        ;Bytes are sent by storing values to Port B
-        lda #XX
-	sta $dd01
-```
-
-Inputting MIDI
---------------
-
-```
-	;Reset PA2 to signal INPUT mode
-	lda $dd00
-	and #%11111011	;Set bit2 to 0
-	sta $dd00
-
-	;Set Port B to input
-	lda #$00
-	sta $dd03
-
-	;Read the available number of bytes. Max number of bytes in one go is 255 (not 256)
-	ldy $dd01	;Read bytecount from Port B
-	beq .nobytesleft
-.getmidiindata:
-	lda $dd01 ;Read MIDI byte from Port B
-	sta $XXXX ;Wherever desired
-	dey
-	bne .getmidiindata
-.nobytesleft:
-```
-
-C64 to Vessel commands
-----------------------
-
-The C64 can send Vessel a command, by sending byte 0xFD (not used by MIDI),
-and then a command, and then a fixed number of data bytes (depending on the
-command - unless otherwise specified, a command is followed by 0 data bytes).
-
-By default, transparent mode is off, NMI on external input is off, all MIDI channels
-are masked and all status messages will be masked (no MIDI messages will be sent
-to the C64) and MIDI through is disabled.
-
-|byte|command     |arg bytes|description
-|----|------------|---------|--------------------------------------------------------------------------
-|0x00|Reset       |         |Vessel will reset to default config.
-|0x01|Purge       |         |Vessel will discard any buffered data.
-|0x02|Panic       |         |Reserved for future implementation. Send all notes off on all channels.
-|0x03|Version     |         |Vessel will return a version string (currently C64 screen code "vessel00").
-|0x04|Config      |CF       |CF bit 0 enables NMI, bit 1 enables MIDI through, bit 2 enables transparent (no MIDI parsing) mode, bit 3 enables NMI for status messages only (requires bit 0).
-|0x05|Channel mask|HH LL    |High byte (HH), low byte (LL) for channels 1 to 16.
-|0x06|Status mask |HH LL    |High byte (HH), low byte (LL) for channel-less messages F0 to FF.
-|0x07|Control mask|CM       |MSB unused, 3 high bits command mask, 4 low bits channel.
-
+The C64-side protocol — configuration, sending and receiving MIDI, and the full
+set of C64-to-Vessel commands — is documented in [docs/API.md](docs/API.md).
 
 Upgrading firmware (SAMD21 hardware)
 ------------------------------------
@@ -233,79 +107,18 @@ On Linux, WInterrupts.c can be located with:
 
 If you will upgrade the IDE you will have to make these changes again. 
 
-
 Vesselmon
 ---------
 
-Vesselmon is a small C64 test program for Vessel, which allows sending and receiving
-(including with a loopback MIDI cable).
+Vesselmon is a small C64 test program for Vessel (send/receive, including with a
+loopback MIDI cable). See [docs/VESSELMON.md](docs/VESSELMON.md).
 
-In this example, the user sends the version command and receives the version string response.
+Tests
+-----
 
-```
-I/O? O
- 1 ? 253
- 2 ? 3
- 3 ? -1
- 253
- 3
-I/O? I
- 8
- 1         22
- 2         5
- 3         19
- 4         19
- 5         5
- 6         12
- 7         48
- 8         48
-I/O? X
-```
-
-Host tests
-----------
-
-Vessel's parsing logic (the C64 command protocol, MIDI message filtering, and
-USB-MIDI packet decoding) can be unit tested on a regular PC, with no Arduino
-hardware. The tests `#include` the real `vessel.ino` and compile it natively:
-the hardware seams in `platform.h`, `pins.h`, and `CRDigitalPin.h` have an
-`ARCH_HOST` branch (selected only for the host build) that routes the C64 user
-port and MIDI UART through in-memory buffers, so a test can feed bytes in and
-assert on what the firmware parses and emits. The real "MIDI Library" is used,
-so the MIDI parser is exercised end to end.
-
-The tests, mocks, and build live under `test/host/`.
-
-Run them in Docker (matches CI exactly):
-
-```
-docker build -t vessel-test .
-```
-
-The image build configures, compiles, and runs the suite, so it fails if any
-test fails. To re-run without rebuilding: `docker run --rm vessel-test`.
-
-Run them directly (needs `cmake`, a C++ compiler, `git`, and `clang-format`):
-
-```
-cmake -S test/host -B build
-cmake --build build
-ctest --test-dir build --output-on-failure
-```
-
-GoogleTest and the MIDI Library are fetched automatically (pinned versions) by
-CMake.
-
-Code formatting
----------------
-
-All C/C++ sources are formatted with `clang-format` (LLVM style; see
-`.clang-format`). The `clang_format` ctest case fails if any tracked source is
-not formatted, so CI catches drift. To reformat in place:
-
-```
-test/host/tools/check-format.sh --fix
-```
+Vessel's parsing logic is unit-tested on a host PC with no Arduino hardware,
+including integration tests that replay how real applications drive Vessel. See
+[docs/TESTS.md](docs/TESTS.md).
 
 References
 ----------
