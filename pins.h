@@ -23,20 +23,40 @@ const uint32_t PB_PINS = 0xff;
 #ifdef ARDUINO_ARCH_SAMD
 
 // https://learn.sparkfun.com/tutorials/samd21-minidev-breakout-hookup-guide/samd21-dev-breakout-overview
-#define C64_PC2 A2 // PB09
-#define C64_PA2 A1 // PB08
+#define C64_PC2 A2  // PB09
+#define C64_PA2 A1  // PB08
 #define C64_FLAG 31 // PB23
 #define DATA_DIR 30 // PB22
-#define STATUS A5 // PB02
+#define STATUS A5   // PB02
 
-#define C64_PB0 11 // PA16
-#define C64_PB1 13 // PA17
-#define C64_PB2 10 // PA18
-#define C64_PB3 12 // PA19
-#define C64_PB4 6 // PA20
-#define C64_PB5 7 // PA21
+#define C64_PB0 11  // PA16
+#define C64_PB1 13  // PA17
+#define C64_PB2 10  // PA18
+#define C64_PB3 12  // PA19
+#define C64_PB4 6   // PA20
+#define C64_PB5 7   // PA21
 #define C64_PB6 SDA // PA22
 #define C64_PB7 SCL // PA23
 
 const uint32_t PB_PINS = 0x00FF0000;
+#endif
+
+#ifdef ARCH_HOST
+// Arbitrary distinct pin numbers for host tests; only their identity matters.
+#define C64_PC2 41
+#define C64_PA2 40
+#define C64_FLAG 74
+#define DATA_DIR 44
+// STATUS intentionally left undefined so blink() compiles to a no-op.
+
+#define C64_PB0 0
+#define C64_PB1 1
+#define C64_PB2 2
+#define C64_PB3 3
+#define C64_PB4 4
+#define C64_PB5 5
+#define C64_PB6 6
+#define C64_PB7 7
+
+const uint32_t PB_PINS = 0xff;
 #endif

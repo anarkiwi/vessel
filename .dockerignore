@@ -1,0 +1,4 @@
+# Keep the local CMake build tree (and its fetched deps) out of the image so
+# the container always configures cleanly. .git is intentionally NOT ignored:
+# the clang-format check uses `git ls-files` to enumerate tracked sources.
+build/

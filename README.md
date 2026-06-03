@@ -262,6 +262,51 @@ I/O? I
 I/O? X
 ```
 
+Host tests
+----------
+
+Vessel's parsing logic (the C64 command protocol, MIDI message filtering, and
+USB-MIDI packet decoding) can be unit tested on a regular PC, with no Arduino
+hardware. The tests `#include` the real `vessel.ino` and compile it natively:
+the hardware seams in `platform.h`, `pins.h`, and `CRDigitalPin.h` have an
+`ARCH_HOST` branch (selected only for the host build) that routes the C64 user
+port and MIDI UART through in-memory buffers, so a test can feed bytes in and
+assert on what the firmware parses and emits. The real "MIDI Library" is used,
+so the MIDI parser is exercised end to end.
+
+The tests, mocks, and build live under `test/host/`.
+
+Run them in Docker (matches CI exactly):
+
+```
+docker build -t vessel-test .
+```
+
+The image build configures, compiles, and runs the suite, so it fails if any
+test fails. To re-run without rebuilding: `docker run --rm vessel-test`.
+
+Run them directly (needs `cmake`, a C++ compiler, `git`, and `clang-format`):
+
+```
+cmake -S test/host -B build
+cmake --build build
+ctest --test-dir build --output-on-failure
+```
+
+GoogleTest and the MIDI Library are fetched automatically (pinned versions) by
+CMake.
+
+Code formatting
+---------------
+
+All C/C++ sources are formatted with `clang-format` (LLVM style; see
+`.clang-format`). The `clang_format` ctest case fails if any tracked source is
+not formatted, so CI catches drift. To reformat in place:
+
+```
+test/host/tools/check-format.sh --fix
+```
+
 References
 ----------
 
