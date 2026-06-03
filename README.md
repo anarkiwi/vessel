@@ -30,6 +30,7 @@ as it has its own protocol. Currently known applications are:
 | [Vessel ASID Player](https://github.com/anarkiwi/vap/releases) | Turns the C64's SID(s) into a remote ASID synthesis device | Receives MIDI SysEx (ASID protocol) to write SID registers; supports dual SID |
 | [Vicficken](https://github.com/anarkiwi/vvf/releases) | MIDI-controlled port of the Vicficken synth | Receives MIDI to drive all synth parameters (replacing joystick/paddle/keyboard) |
 | [Vessel MIDI Player](https://github.com/anarkiwi/vmp/releases) | Turns the C64's SID(s) into a multi-voice MIDI synth | Receives notes, pitchbend and CC across channels; relies on Vessel's large buffers, CIA parallel transfer and MIDI message filtering |
+| [defMONV](https://github.com/anarkiwi/defmonv/releases) | Patched defMON C64 music tracker that acts as a MIDI clock master | Sends MIDI clock ($F8), start ($FA) and stop ($FC) over Vessel to sync external gear, replacing defMON's ScannerBoy sync |
 | [Vesselmon](https://github.com/anarkiwi/vessel) | Reference test/monitor program in the Vessel repository | Configures Vessel and exercises raw MIDI send/receive (including loopback) and device detection |
 
 Theory of operation
