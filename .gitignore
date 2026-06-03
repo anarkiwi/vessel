@@ -1,3 +1,6 @@
+# Host test CMake build tree (vendored deps fetched here)
+/build/
+
 # Prerequisites
 *.d
 

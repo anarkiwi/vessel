@@ -125,23 +125,34 @@ void inline blink() {
 class FakeSerial {
 public:
   void begin(int BaudRate __attribute__((unused))) {}
-  inline __attribute__((always_inline)) void qread(byte i) { c[n++] = i; }
-  inline __attribute__((always_inline)) byte read() { return c[--n]; }
+  // FIFO: bytes are read back in the order they were queued. UsbMidiRx queues
+  // several bytes before MIDI.read() drains them, so order must be preserved.
+  inline __attribute__((always_inline)) void qread(byte i) {
+    c[tail++] = i;
+    ++n;
+  }
+  inline __attribute__((always_inline)) byte read() {
+    --n;
+    return c[head++];
+  }
   inline __attribute__((always_inline)) void write(byte i) {
     outBuf[vesselConfig.outBufReadPtr++] = i;
     ++vesselConfig.pendingOut;
   }
   inline __attribute__((always_inline)) void ctrl_write(byte i) {
     write(i);
-    // send NMI on control message or sysex stop.
-    if ((i | 0x80) && (i != midi::MidiType::SystemExclusiveStart)) {
+    // send NMI on status byte or sysex stop.
+    if ((i & 0x80) && (i != midi::MidiType::SystemExclusiveStart)) {
       NMI_WRAP(blink());
     }
   }
   inline __attribute__((always_inline)) unsigned available() { return n; }
 
 private:
+  // head/tail wrap naturally at IN_BUF_SIZE (256) since they are bytes.
   volatile byte c[IN_BUF_SIZE] = {};
+  volatile byte head = 0;
+  volatile byte tail = 0;
   volatile byte n = 0;
 };
 
@@ -375,6 +386,8 @@ inline void versionCmd() {
 
 inline void resetCmd() {
   memset(&vesselConfig, 0, sizeof(vesselConfig));
+  // receiveCommandMask is a separate global, so clear it too for a full reset.
+  memset(receiveCommandMask, 0, sizeof(receiveCommandMask));
   MIDI.turnThruOff();
 }
 

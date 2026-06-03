@@ -1,26 +1,24 @@
 #ifdef ARDUINO_ARCH_SAM
-#define DISABLE_UART_INT(x) { x->US_IDR = 0xFFFFFFFF; NVIC_ClearPendingIRQ( x ## _IRQn ); NVIC_DisableIRQ( x ## _IRQn ); }
+#define DISABLE_UART_INT(x)                                                    \
+  {                                                                            \
+    x->US_IDR = 0xFFFFFFFF;                                                    \
+    NVIC_ClearPendingIRQ(x##_IRQn);                                            \
+    NVIC_DisableIRQ(x##_IRQn);                                                 \
+  }
 
 DigitalPin<CONT_DIR> controlDirPin(OUTPUT, LOW);
 
-// TODO: would be cleaner to subclass UARTClass without interrupts or a ringbuffer.
+// TODO: would be cleaner to subclass UARTClass without interrupts or a
+// ringbuffer.
 // https://github.com/arduino/ArduinoCore-sam/blob/master/cores/arduino/UARTClass.cpp
 // bypass all interrupt usage and do polling with our own ringbuffer.
-inline bool uartTxready() {
-  return USART1->US_CSR & US_CSR_TXRDY;
-}
+inline bool uartTxready() { return USART1->US_CSR & US_CSR_TXRDY; }
 
-inline void uartWrite(byte b) {
-  USART1->US_THR = b;
-}
+inline void uartWrite(byte b) { USART1->US_THR = b; }
 
-inline bool uartRxready() {
-  return USART1->US_CSR & US_CSR_RXRDY;
-}
+inline bool uartRxready() { return USART1->US_CSR & US_CSR_RXRDY; }
 
-inline byte uartRead() {
-  return USART1->US_RHR;
-}
+inline byte uartRead() { return USART1->US_RHR; }
 
 inline void initPlatform() {
   Serial2.begin(31250);
@@ -48,9 +46,7 @@ inline byte getByte() {
   return REG_PIOD_PDSR; // only need to return LSB
 }
 
-inline void setByte(byte b) {
-  REG_PIOD_ODSR = b;
-}
+inline void setByte(byte b) { REG_PIOD_ODSR = b; }
 
 void IoIsr();
 
@@ -65,8 +61,10 @@ void PIOC_Handler(void) {
 #endif
 
 #ifdef ARDUINO_ARCH_SAMD
-#include <Arduino.h>   // required before wiring_private.h
+// clang-format off
+#include <Arduino.h>        // required before wiring_private.h
 #include "wiring_private.h" // pinPeripheral() function
+// clang-format on
 
 // https://learn.sparkfun.com/tutorials/samd21-minidev-breakout-hookup-guide/setting-up-arduino
 // https://learn.sparkfun.com/tutorials/adding-more-sercom-ports-for-samd-boards/all
@@ -78,21 +76,13 @@ void PIOC_Handler(void) {
 
 Uart MidiSerial(&VSERCOM, MIDI_RX, MIDI_TX, SERCOM_RX_PAD_3, UART_TX_PAD_2);
 
-inline bool uartTxready() {
-  return VSERCOM.isDataRegisterEmptyUART();
-}
+inline bool uartTxready() { return VSERCOM.isDataRegisterEmptyUART(); }
 
-inline void uartWrite(byte b) {
-  VSERCOM.writeDataUART(b);
-}
+inline void uartWrite(byte b) { VSERCOM.writeDataUART(b); }
 
-inline bool uartRxready() {
-  return VSERCOM.availableDataUART();
-}
+inline bool uartRxready() { return VSERCOM.availableDataUART(); }
 
-inline byte uartRead() {
-  return VSERCOM.readDataUART();
-}
+inline byte uartRead() { return VSERCOM.readDataUART(); }
 
 inline void initPlatform() {
   // see SERCOM::initUART()
@@ -102,23 +92,56 @@ inline void initPlatform() {
   pinPeripheral(C64_FLAG, PIO_OUTPUT);
   pinPeripheral(C64_PA2, PIO_INPUT);
   MidiSerial.begin(31250);
-  SERCOM->USART.INTENCLR.reg = SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
+  SERCOM->USART.INTENCLR.reg =
+      SERCOM_USART_INTENSET_RXC | SERCOM_USART_INTENSET_ERROR;
 }
 
-inline void setDataDirInput() {
-  PORT->Group[PORTA].DIRCLR.reg = PB_PINS;
-}
+inline void setDataDirInput() { PORT->Group[PORTA].DIRCLR.reg = PB_PINS; }
 
 inline void setDataDirOutput() {
   PORT->Group[PORTA].DIRCLR.reg = PB_PINS;
   PORT->Group[PORTA].DIRSET.reg = PB_PINS;
 }
 
-inline byte getByte() {
-  return PORT->Group[PORTA].IN.reg >> 16;
+inline byte getByte() { return PORT->Group[PORTA].IN.reg >> 16; }
+
+inline void setByte(byte b) { PORT->Group[PORTA].OUT.reg = b << 16; }
+#endif
+
+#ifdef ARCH_HOST
+// Host tests: the C64 user port and MIDI DIN UART are replaced by in-memory
+// FIFOs in host_sim, so the firmware's byte I/O can be driven and observed
+// from a unit test without any hardware.
+#include "host_sim.h"
+
+inline bool uartTxready() { return true; }
+
+inline void uartWrite(byte b) { hostsim::uartTx.push_back(b); }
+
+inline bool uartRxready() { return !hostsim::uartIn.empty(); }
+
+inline byte uartRead() {
+  byte b = hostsim::uartIn.front();
+  hostsim::uartIn.pop_front();
+  return b;
 }
 
-inline void setByte(byte b) {
-  PORT->Group[PORTA].OUT.reg = b << 16;
+inline void initPlatform() {}
+
+inline void setDataDirInput() {}
+
+inline void setDataDirOutput() {}
+
+// Returns the next byte the C64 "wrote" to the user port (0 if none).
+inline byte getByte() {
+  if (hostsim::portIn.empty()) {
+    return 0;
+  }
+  byte b = hostsim::portIn.front();
+  hostsim::portIn.pop_front();
+  return b;
 }
+
+// Captures a byte the firmware sent to the C64.
+inline void setByte(byte b) { hostsim::portOut.push_back(b); }
 #endif
