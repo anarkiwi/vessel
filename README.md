@@ -13,7 +13,7 @@ Vessel's main points of differences from other C64 MIDI interfaces are:
 * it does not use/need any CIA shift register ports
 * it can generate an NMI on MIDI clock (allowing an application to be precisely synchronized)
 * it can transfer multiple bytes per transaction (unlike ACIA/6850 designs)
-* the C64 can have configure Vessel to filter MIDI messages to save CPU time
+* the C64 can configure Vessel to filter MIDI messages to save CPU time
 
 If you are interested in acquiring a Vessel please contact josh@vandervecken.com.
 
