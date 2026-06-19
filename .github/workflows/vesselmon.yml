@@ -4,7 +4,7 @@ jobs:
   vesselmon:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       - name: Install VICE (c1541) and clang-format
         run: |
           sudo apt-get update

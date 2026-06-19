@@ -4,7 +4,7 @@ jobs:
   host-test:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
       # The Dockerfile builds the native tests and runs ctest (unit tests +
       # clang-format check) as part of the image build, so a failing test or an
       # unformatted source fails this step.
