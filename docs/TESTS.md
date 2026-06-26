@@ -28,6 +28,9 @@ applications, driving Vessel in deliberately different ways, are covered:
   NMI-status-only). Covers that a MIDI clock is forwarded *and* pulses /FLAG
   while channel messages are suppressed. Protocol read from its open ACME
   source; see [`../test/sidwizard/PROTOCOL.md`](../test/sidwizard/PROTOCOL.md).
+  The polled [anarkiwi/sid-wizard](https://github.com/anarkiwi/sid-wizard) fork
+  (SID Wizard 1.97) carries a mirror of these tests on the SID-Wizard side,
+  asserting the bytes it emits with a 6502 simulator.
 
 These run in the same suite with no extra dependencies, so a firmware change
 that breaks either application fails CI. (A heavier optional lane could
