@@ -10,6 +10,16 @@ Unlike Station64 (see `../station64/PROTOCOL.md`), SID Wizard is open source, so
 this was read directly from the ACME assembly — no decrunching/emulation needed.
 Source references below are to that repo.
 
+> There is a second Vessel fork,
+> [anarkiwi/sid-wizard](https://github.com/anarkiwi/sid-wizard) (now based on
+> SID Wizard 1.97). It **polls** MIDI each frame instead of using
+> NMI-on-MIDI-clock, so it sends the same device-open handshake (sections 1
+> below) but not the `FD 04 09` NMI config. That fork carries its own mirror of
+> these tests on the SID-Wizard side — it runs its real 6502 routines on a 6502
+> simulator and asserts the bytes it emits — in its `test/sidwizard/`
+> (`run_protocol_test.py`, `PROTOCOL.md`). The two suites pin opposite ends of
+> the same wire.
+
 ## What makes it different from Station64
 
 | | Station64 | SID Wizard |

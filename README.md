@@ -25,7 +25,7 @@ as it has its own protocol. Currently known applications are:
 
 | Application | What it is | Vessel functionality used |
 | --- | --- | --- |
-| [SID Wizard 1.8.7](https://github.com/anarkiwi/sid-wizard/releases) / [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard-vessel) | Native C64 music tracker with live-performance MIDI sync | Receives external MIDI clock; uses Vessel's NMI-on-MIDI-clock to run playback precisely synchronized to external gear |
+| [SID Wizard 1.97](https://github.com/anarkiwi/sid-wizard/releases) / [M64 SID Wizard](https://github.com/M64GitHub/sid-wizard-vessel) | Native C64 music tracker with live-performance MIDI sync | Receives external MIDI clock to sync playback to external gear. The anarkiwi fork (now based on SID Wizard 1.97) polls MIDI each frame; the M64 fork uses Vessel's NMI-on-MIDI-clock for tighter sync |
 | [defMONV](https://github.com/anarkiwi/defmonv/releases) | Patched defMON C64 music tracker that acts as a MIDI clock master | Sends MIDI clock ($F8), start ($FA) and stop ($FC) over Vessel to sync external gear, replacing defMON's ScannerBoy sync |
 | [Station64 V2.6](https://csdb.dk/release/?id=207214) | C64 MIDI tracker/performance station | MIDI input and output |
 | [Vessel ASID Player](https://github.com/anarkiwi/vap/releases) | Turns the C64's SID(s) into a remote ASID synthesis device | Receives MIDI SysEx (ASID protocol) to write SID registers; supports dual SID |
