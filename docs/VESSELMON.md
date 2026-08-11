@@ -44,10 +44,16 @@ i/o? x
 
 ```
 cd vesselmon
-make            # build vesselmon.prg and vesselmon.d64 (needs llvm-mos + c1541)
+make            # build vesselmon.prg and vesselmon.d64
 make test       # build and run the host unit tests
 make format-check
 ```
+
+llvm-mos, `c1541` and `clang-format` run from pinned container images
+([docker-mos-llvm-sdk](https://github.com/anarkiwi/docker-mos-llvm-sdk),
+[asid-vice](https://github.com/anarkiwi/asid-vice)), so a container runtime and a host C
+compiler are the only build dependencies. Set `MOS`, `C1541` or `CLANG_FORMAT` to use host
+installs instead.
 
 The Vessel I/O logic is split into a portable core (`vesselmon_core.c`) behind a
 small port interface (`vesselport.h`), so it is unit tested on a host against a

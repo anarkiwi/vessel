@@ -6,13 +6,21 @@
 #   make test        build and run the host unit tests
 #   make format-check / format    enforce / apply clang-format LLVM style
 #
-# Requires: mos-c64-clang (llvm-mos SDK) on PATH, c1541 (VICE), a host C
-# compiler, and clang-format.
+# Requires a container runtime (llvm-mos SDK, c1541 and clang-format run from
+# pinned images) and a host C compiler for the unit tests. Set MOS, C1541 or
+# CLANG_FORMAT to use host installs instead.
 
-MOS ?= mos-c64-clang
-C1541 ?= c1541
+MOS_IMAGE ?= ghcr.io/anarkiwi/docker-mos-llvm-sdk:v23.0.1
+VICE_IMAGE ?= anarkiwi/asid-vice:3.10.0.0
+DOCKER_RUN := docker run --rm -u $(shell id -u):$(shell id -g) \
+    -v $(CURDIR):/work -w /work
+
+MOS ?= $(DOCKER_RUN) $(MOS_IMAGE) mos-c64-clang
+# HOME must be writable by the calling uid or VICE logs errors creating its
+# config, cache and state directories.
+C1541 ?= $(DOCKER_RUN) -e HOME=/tmp --entrypoint c1541 $(VICE_IMAGE)
 CC ?= cc
-CLANG_FORMAT ?= clang-format
+CLANG_FORMAT ?= $(DOCKER_RUN) $(MOS_IMAGE) clang-format
 
 SRC = vesselmon.c vesselmon_core.c vesselport_c64.c
 HDR = vesselmon_core.h vesselport.h
