@@ -5,15 +5,6 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - name: Install VICE (c1541) and clang-format
-        run: |
-          sudo apt-get update
-          sudo DEBIAN_FRONTEND=noninteractive apt-get install -y vice clang-format
-      - name: Install llvm-mos SDK
-        run: |
-          curl -fsSL https://github.com/llvm-mos/llvm-mos-sdk/releases/latest/download/llvm-mos-linux.tar.xz \
-            | sudo tar -xJ -C /opt
-          echo "/opt/llvm-mos/bin" >> "$GITHUB_PATH"
       - name: clang-format check (LLVM)
         run: make -C vesselmon format-check
       - name: Host unit tests
