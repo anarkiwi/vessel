@@ -1,12 +1,16 @@
 name: periodic test
 on:
   schedule:
-    # NZST = UTC + 12
-    # Schedule to run at midnight & lunch-time
-    - cron: '0 0,12 * * *'
+    - cron: '17 3 * * 0'
+  workflow_dispatch:
+
+concurrency:
+  group: periodic
+  cancel-in-progress: true
 jobs:
   test-matrix:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     strategy:
       matrix:
         arduino-platform: ["arduino:sam", "arduino:samd"]
